@@ -15,7 +15,7 @@ edition = "2021"
 rust-version = "1.77"
 license = "GPL-3.0-or-later"
 authors = ["Sanctum contributors"]
-repository = "https://github.com/USER/sanctum"
+repository = "https://github.com/wgravel855-lang/sanctum"
 
 [workspace.dependencies]
 # Shared, version-pinned in one place.
