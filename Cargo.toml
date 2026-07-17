@@ -1,0 +1,41 @@
+# Sanctum — Rust workspace (service + watchdog + shared core).
+# The Tauri UI lives under ui/ and builds via `npm run tauri` (its own manifest).
+[workspace]
+resolver = "2"
+members = [
+    "crates/sanctum-core",
+    "crates/sanctum-service",
+    "crates/sanctum-watchdog",
+    "crates/sanctum-recover",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77"
+license = "GPL-3.0-or-later"
+authors = ["Sanctum contributors"]
+repository = "https://github.com/USER/sanctum"
+
+[workspace.dependencies]
+# Shared, version-pinned in one place.
+anyhow = "1"
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+argon2 = { version = "0.5", features = ["std"] }
+chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "io-util", "signal"] }
+
+# Internal
+sanctum-core = { path = "crates/sanctum-core" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

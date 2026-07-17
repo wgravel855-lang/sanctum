@@ -1,0 +1,21 @@
+[package]
+name = "sanctum-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Shared core for Sanctum: domain matching, hosts-section management, storage, and password hashing."
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rusqlite.workspace = true
+argon2.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+# Pinned to the same minor as argon2's password-hash so salt RNG (OsRng) is available.
+password-hash = { version = "0.5", features = ["getrandom", "std"] }
+
+[dev-dependencies]
+tempfile = "3"

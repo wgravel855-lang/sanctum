@@ -1,0 +1,67 @@
+# Sanctum — starter adult-content blocklist
+# ------------------------------------------------------------------
+# Format: one bare registrable domain per line. Lines beginning with
+# '#' are comments; blank lines are ignored. Domains are matched
+# case-insensitively, and a listed domain blocks that domain AND all
+# of its subdomains (e.g. "example.com" also blocks "www.example.com"
+# and "cdn.example.com"). Do NOT prefix with a scheme or "www.".
+#
+# This is a deliberately small, curated starter set. Users can extend
+# it with their own custom list and/or import a larger community list
+# from a pinned HTTPS URL (see README). Sanctum never fetches lists
+# from anywhere except the URL you configure.
+#
+# schema: sanctum-blocklist/1
+# category: adult
+# ------------------------------------------------------------------
+
+pornhub.com
+xvideos.com
+xnxx.com
+xhamster.com
+redtube.com
+youporn.com
+tube8.com
+spankbang.com
+youjizz.com
+porn.com
+porntrex.com
+eporner.com
+hqporner.com
+txxx.com
+upornia.com
+hclips.com
+tnaflix.com
+empflix.com
+drtuber.com
+nuvid.com
+sunporno.com
+porn300.com
+porndig.com
+4tube.com
+pornhd.com
+beeg.com
+motherless.com
+xxx.com
+brazzers.com
+realitykings.com
+naughtyamerica.com
+bangbros.com
+mofos.com
+digitalplayground.com
+onlyfans.com
+fansly.com
+chaturbate.com
+bongacams.com
+stripchat.com
+livejasmin.com
+cam4.com
+myfreecams.com
+camsoda.com
+adultfriendfinder.com
+rule34.xxx
+e621.net
+nhentai.net
+hentaihaven.xxx
+hanime.tv
+literotica.com

@@ -1,0 +1,17 @@
+[package]
+name = "sanctum-recover"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Standalone Safe-Mode / manual teardown for Sanctum: restores DNS and removes all Sanctum changes, even if the service is gone."
+
+[[bin]]
+name = "sanctum-recover"
+path = "src/main.rs"
+
+[dependencies]
+sanctum-core = { workspace = true }
+sanctum-service = { path = "../sanctum-service" }
+anyhow = { workspace = true }
+serde_json = { workspace = true }

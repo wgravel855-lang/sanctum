@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Sanctum design system — Apple-minimalist.
+   One restrained accent (calm sage green). Soft neutral surfaces. System-
+   reactive dark mode. No gradients, no glow, no shadow soup.
+--------------------------------------------------------------------------- */
+
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #f0f0f2;
+  --text: #1c1c1e;
+  --muted: #86868b;
+  --border: rgba(0, 0, 0, 0.08);
+  --accent: #5b8f7a;
+  --accent-hover: #4e7d6a;
+  --accent-soft: rgba(91, 143, 122, 0.12);
+  --accent-contrast: #ffffff;
+  --danger: #b3261e;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --surface: #1c1c1e;
+    --surface-2: #2c2c2e;
+    --text: #f5f5f7;
+    --muted: #98989d;
+    --border: rgba(255, 255, 255, 0.10);
+    --accent: #74ab93;
+    --accent-hover: #83b8a1;
+    --accent-soft: rgba(116, 171, 147, 0.16);
+    --accent-contrast: #0b0f0d;
+    color-scheme: dark;
+  }
+}
+
+/* Explicit theme toggle wins over the media query (both directions). */
+:root[data-theme="light"] {
+  --bg: #f5f5f7; --surface: #ffffff; --surface-2: #f0f0f2; --text: #1c1c1e;
+  --muted: #86868b; --border: rgba(0,0,0,0.08); --accent: #5b8f7a;
+  --accent-hover: #4e7d6a; --accent-soft: rgba(91,143,122,0.12);
+  --accent-contrast: #ffffff; color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #000000; --surface: #1c1c1e; --surface-2: #2c2c2e; --text: #f5f5f7;
+  --muted: #98989d; --border: rgba(255,255,255,0.10); --accent: #74ab93;
+  --accent-hover: #83b8a1; --accent-soft: rgba(116,171,147,0.16);
+  --accent-contrast: #0b0f0d; color-scheme: dark;
+}
+
+/* Map semantic tokens to Tailwind utilities (bg-surface, text-muted, …). */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-danger: var(--danger);
+  --font-sans: "Inter Variable", -apple-system, "Segoe UI", system-ui, Roboto,
+    sans-serif;
+  --font-display: "Fraunces Variable", "Fraunces", Georgia, "Times New Roman",
+    serif;
+}
+
+/* Characterful display face, used with restraint on calm statements only —
+   headlines, screen titles, the breathing prompt. Never on UI/data/body. */
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-variation-settings: "SOFT" 40, "WONK" 0;
+  letter-spacing: -0.01em;
+  font-weight: 460;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Subtle, fast micro-animations only. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: rise 180ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise {
+    animation: none;
+  }
+  * {
+    transition: none !important;
+  }
+}

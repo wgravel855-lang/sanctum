@@ -1,0 +1,28 @@
+# Rust
+/target/
+**/target/
+
+# Node / Tauri UI
+node_modules/
+ui/dist/
+ui/node_modules/
+dist/
+
+# Logs & local state
+*.log
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local secrets / env
+.env
+.env.*
+
+# Build/installer artifacts
+*.msi
+*.msix
+sanctum-setup*.exe
+
+# Keep Cargo.lock committed (this is an application, not a library)

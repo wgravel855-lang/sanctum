@@ -1,0 +1,58 @@
+// Mirrors sanctum-core::ipc (serde). Response is adjacently tagged
+// (`resp` + `body`); Command is internally tagged (`cmd`).
+
+export type TimeWindow = {
+  start_min: number;
+  end_min: number;
+  days: number[];
+};
+
+export type Schedule =
+  | { mode: "always_on" }
+  | { mode: "off" }
+  | { mode: "windows"; windows: TimeWindow[] }
+  | { mode: "focus"; ends_at: string };
+
+export interface Status {
+  protection_active: boolean;
+  degraded: boolean;
+  total_blocked: number;
+  protected_days: number;
+  streak: number;
+  locked: boolean;
+  locked_until: string | null;
+  schedule: Schedule;
+  blocklist_count: number;
+  has_password: boolean;
+  all_browsers: boolean;
+}
+
+export interface EventDto {
+  ts: string;
+  kind: string;
+  detail: string;
+}
+
+export type Command =
+  | { cmd: "get_status" }
+  | { cmd: "recent_events"; limit: number }
+  | { cmd: "add_block"; domain: string }
+  | { cmd: "remove_block"; domain: string; password: string }
+  | { cmd: "add_allow"; domain: string; password: string }
+  | { cmd: "remove_allow"; domain: string }
+  | { cmd: "set_schedule"; schedule: Schedule; password: string }
+  | { cmd: "start_lock"; minutes: number }
+  | { cmd: "extend_lock"; minutes: number }
+  | { cmd: "set_password"; new: string; current: string | null }
+  | { cmd: "verify_password"; password: string }
+  | { cmd: "disable_protection"; password: string }
+  | { cmd: "enable_protection" }
+  | { cmd: "delete_history" };
+
+export type Response =
+  | { resp: "status"; body: Status }
+  | { resp: "events"; body: EventDto[] }
+  | { resp: "deleted"; body: { count: number } }
+  | { resp: "ok" }
+  | { resp: "denied"; body: { reason: string } }
+  | { resp: "error"; body: { message: string } };

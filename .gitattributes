@@ -1,0 +1,16 @@
+# Sanctum uses CRLF line endings on checkout (Windows-native project).
+* text=auto eol=crlf
+
+# Shell scripts must stay LF even on Windows checkout.
+*.sh text eol=lf
+
+# Binary assets — never normalize.
+*.png binary
+*.ico binary
+*.icns binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.woff  binary
+*.woff2 binary
+*.db    binary

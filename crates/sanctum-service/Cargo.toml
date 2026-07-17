@@ -1,0 +1,39 @@
+[package]
+name = "sanctum-service"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Sanctum LocalSystem Windows service: DNS sinkhole, hosts enforcement, IPC."
+
+[lib]
+name = "sanctum_service"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sanctum-service"
+path = "src/main.rs"
+
+[dependencies]
+sanctum-core = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+hickory-proto = "0.25.2"
+windows-service = "0.8.1"
+windows = { version = "0.61.3", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_Networking_WinSock", "Win32_Storage_FileSystem", "Win32_UI_WindowsAndMessaging", "Win32_NetworkManagement_WindowsFilteringPlatform", "Win32_System_Services", "Win32_Security", "Win32_System_Rpc"] }
+winreg = "0.56.0"
+
+# DNS wire parsing/building for the sinkhole resolver.
+# (Raw tokio UDP/TCP loops + hickory-proto messages — full control, no
+# RequestHandler trait surface. netcfg/firewall/windows-service land next.)
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "time"] }
+hickory-proto = "0.25.2"
+sanctum-core = { workspace = true }
+tempfile = "3.27.0"

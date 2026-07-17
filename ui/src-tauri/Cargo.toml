@@ -1,0 +1,28 @@
+[package]
+name = "sanctum-app"
+version = "0.1.0"
+description = "Sanctum desktop UI"
+edition = "2021"
+
+# Standalone workspace: the Tauri app is built via `npm run tauri`, not as
+# part of the root Rust workspace (keeps tauri out of `cargo build` at root).
+[workspace]
+
+[lib]
+name = "sanctum_app_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Only for the named-pipe client that relays JSON frames to the service.
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "macros"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

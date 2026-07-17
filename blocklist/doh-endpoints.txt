@@ -1,0 +1,54 @@
+# Sanctum — known DNS-over-HTTPS (DoH) resolver endpoints
+# ------------------------------------------------------------------
+# Why this file exists (honest note):
+#   A local DNS sinkhole only sees plaintext DNS. Modern browsers
+#   (Chrome, Edge, Firefox) increasingly send DNS lookups over HTTPS
+#   (DoH) to their own resolver, which would bypass the sinkhole
+#   entirely. Blocking the *hostnames* of well-known DoH endpoints
+#   makes those browsers fail their secure-DNS probe and fall back to
+#   the system (plaintext) resolver that Sanctum can actually filter.
+#
+#   This is BEST-EFFORT, not absolute: a determined user could type an
+#   IP-literal DoH server that isn't on this list. The locked-session
+#   config ACL raises the friction of doing that; it does not make it
+#   impossible. See README "Honest limitations".
+#
+# Same format as adult-domains.txt: one bare hostname per line,
+# '#' comments, blank lines ignored. Blocks the host and subdomains.
+#
+# schema: sanctum-blocklist/1
+# category: doh
+# ------------------------------------------------------------------
+
+# Google
+dns.google
+dns.google.com
+# Cloudflare
+cloudflare-dns.com
+mozilla.cloudflare-dns.com
+chrome.cloudflare-dns.com
+one.one.one.one
+# Quad9
+dns.quad9.net
+dns9.quad9.net
+dns10.quad9.net
+dns11.quad9.net
+# OpenDNS / Cisco
+doh.opendns.com
+doh.familyshield.opendns.com
+# NextDNS
+dns.nextdns.io
+# AdGuard
+dns.adguard.com
+dns-family.adguard.com
+dns-unfiltered.adguard.com
+# CleanBrowsing
+doh.cleanbrowsing.org
+# Comcast / others
+doh.xfinity.com
+# Generic well-known DoH labels used by many providers
+doh.dns.sb
+dns.dnswarden.com
+doh.li
+dns.rubyfish.cn
+doh.tiar.app

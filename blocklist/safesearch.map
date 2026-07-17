@@ -1,0 +1,42 @@
+# Sanctum — SafeSearch / Restricted-Mode CNAME enforcement map
+# ------------------------------------------------------------------
+# The DNS resolver answers each queried host on the left with a CNAME
+# to the "safe" host on the right. The client then re-queries the safe
+# host, which the resolver forwards upstream normally. This forces
+# SafeSearch / Restricted Mode without a browser extension.
+#
+# NOTE: hosts files cannot express CNAMEs, so this layer is enforced
+# by the DNS resolver only (documented in the README).
+#
+# Format: "<queried-host> <safe-cname-target>" (whitespace-separated),
+# '#' comments, blank lines ignored. Matching is exact host (not
+# subdomain-wildcard) so we only rewrite the specific search hosts.
+#
+# schema: sanctum-safesearch/1
+# ------------------------------------------------------------------
+
+# --- Google SafeSearch (forced) ---
+google.com            forcesafesearch.google.com
+www.google.com        forcesafesearch.google.com
+google.co.uk          forcesafesearch.google.com
+google.ca             forcesafesearch.google.com
+google.com.au         forcesafesearch.google.com
+google.de             forcesafesearch.google.com
+google.fr             forcesafesearch.google.com
+google.co.in          forcesafesearch.google.com
+
+# --- Bing Strict SafeSearch ---
+bing.com              strict.bing.com
+www.bing.com          strict.bing.com
+
+# --- DuckDuckGo Safe Search ---
+duckduckgo.com        safe.duckduckgo.com
+www.duckduckgo.com    safe.duckduckgo.com
+
+# --- YouTube Restricted Mode (Strict) ---
+youtube.com           restrict.youtube.com
+www.youtube.com       restrict.youtube.com
+m.youtube.com         restrict.youtube.com
+youtubei.googleapis.com   restrict.youtube.com
+youtube.googleapis.com    restrict.youtube.com
+www.youtube-nocookie.com  restrict.youtube.com
