@@ -30,7 +30,7 @@
         --ink: #0a0d0b;
         --danger: #d98a84;
         --radius: 16px;
-        --maxw: 1120px;
+        --maxw: 1024px;
         --font-display: "Fraunces", Georgia, "Times New Roman", serif;
         --font-sans: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
       }
@@ -52,7 +52,7 @@
         background: var(--bg);
         color: var(--text);
         font-family: var(--font-sans);
-        font-size: 17px;
+        font-size: 18px;
         line-height: 1.6;
         -webkit-font-smoothing: antialiased;
       }
@@ -193,13 +193,13 @@
         padding: 128px 0 120px;
       }
       .hero h1 {
-        font-size: clamp(2.9rem, 6vw, 4.6rem);
-        margin-top: 26px;
+        font-size: clamp(3.1rem, 6.2vw, 5rem);
+        margin-top: 28px;
       }
       .hero .sub {
-        margin-top: 26px;
-        font-size: 19px;
-        line-height: 1.62;
+        margin-top: 28px;
+        font-size: 20.5px;
+        line-height: 1.6;
         max-width: 40ch;
         color: var(--muted);
       }
@@ -289,13 +289,13 @@
         max-width: 640px;
       }
       .section-head h2 {
-        font-size: clamp(2.1rem, 4vw, 3rem);
-        margin-top: 18px;
+        font-size: clamp(2.3rem, 4.3vw, 3.3rem);
+        margin-top: 20px;
       }
       .section-head p {
-        margin-top: 22px;
+        margin-top: 24px;
         color: var(--muted);
-        font-size: 18px;
+        font-size: 19.5px;
         line-height: 1.6;
       }
 
@@ -349,14 +349,15 @@
       .feature h3 {
         font-family: var(--font-sans);
         font-weight: 600;
-        font-size: 18px;
+        font-size: 19.5px;
         margin-top: 20px;
         letter-spacing: 0;
       }
       .feature p {
-        margin-top: 10px;
+        margin-top: 11px;
         color: var(--muted);
-        font-size: 15.5px;
+        font-size: 16.5px;
+        line-height: 1.55;
       }
 
       /* honest lock: two column */
@@ -499,10 +500,10 @@
       /* reveal */
       .reveal {
         opacity: 0;
-        transform: translateY(14px);
+        transform: translateY(24px);
         transition:
-          opacity 0.5s ease-out,
-          transform 0.5s ease-out;
+          opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+          transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
       }
       .reveal.in {
         opacity: 1;
@@ -854,19 +855,28 @@
         if (e.target.tagName === "A") menu.classList.remove("open");
       });
 
-      // Scroll reveal (respects reduced motion via CSS)
-      const io = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((el) => {
-            if (el.isIntersecting) {
-              el.target.classList.add("in");
-              io.unobserve(el.target);
-            }
-          });
-        },
-        { threshold: 0.14 },
-      );
-      document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+      // Scroll reveal (respects reduced motion via CSS). Trigger once a block
+      // has scrolled ~15% up from the bottom edge, so the slower 0.7s animation
+      // plays where you're actually looking instead of finishing off-screen.
+      // Falls back to simply showing everything if IntersectionObserver is
+      // unavailable, so content is never left hidden.
+      const reveals = document.querySelectorAll(".reveal");
+      if (!("IntersectionObserver" in window)) {
+        reveals.forEach((el) => el.classList.add("in"));
+      } else {
+        const io = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("in");
+                io.unobserve(entry.target);
+              }
+            });
+          },
+          { threshold: 0, rootMargin: "0px 0px -15% 0px" },
+        );
+        reveals.forEach((el) => io.observe(el));
+      }
     </script>
   </body>
 </html>
