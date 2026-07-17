@@ -117,13 +117,37 @@ live hosts file's Sanctum markers are balanced:
 py tools\integrity_check.py
 ```
 
+### Build the installer
+
+One script builds everything into a single NSIS installer — the Tauri app plus
+the three service binaries:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build-installer.ps1
+```
+
+It compiles the service binaries in release, stages them as Tauri `externalBin`
+sidecars, and runs `npm run tauri build`. The result is:
+
+```
+ui\src-tauri\target\release\bundle\nsis\Sanctum_0.1.0_x64-setup.exe
+```
+
+The installer runs **per-machine (elevated)**, so its install hook registers the
+Sanctum service and watchdog automatically, and its uninstall hook removes them —
+except while a locked session is active, where it honestly refuses and points at
+the Safe-Mode escape (see [installer-hooks.nsh](ui/src-tauri/installer-hooks.nsh)).
+
+> Distributing an unsigned LocalSystem service will trip SmartScreen/Defender.
+> For a public release, Authenticode-sign the binaries and the installer.
+
 ---
 
 ## Install and run (elevated)
 
-> Installing a LocalSystem service and changing adapter DNS requires
-> Administrator rights. Sanctum's UI never has them — only the CLI installer
-> does, at your explicit request.
+> Installing the service by hand is only needed if you skip the installer above.
+> A LocalSystem service and adapter-DNS changes require Administrator rights;
+> Sanctum's UI never has them.
 
 ```powershell
 # Put all three binaries in one directory, then, from an elevated prompt:

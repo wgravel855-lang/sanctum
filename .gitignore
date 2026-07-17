@@ -8,6 +8,10 @@ ui/dist/
 ui/node_modules/
 dist/
 
+# Tauri build staging / generated
+ui/src-tauri/binaries/
+ui/src-tauri/gen/
+
 # Logs & local state
 *.log
 *.tmp
