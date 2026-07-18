@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import Button from "./Button";
+import { Group, Row } from "./List";
 
 // 4-7-8 breathing: inhale 4s, hold 7s, exhale 8s (19s cycle).
 const PHASES = [
   { label: "Breathe in", secs: 4, scale: 1 },
   { label: "Hold", secs: 7, scale: 1 },
-  { label: "Breathe out", secs: 8, scale: 0.6 },
+  { label: "Breathe out", secs: 8, scale: 0.55 },
 ] as const;
 
 const DISTRACTIONS = [
@@ -23,15 +25,16 @@ export default function UrgeOverlay({ onClose }: { onClose: () => void }) {
       window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
 
-  // Session countdown.
   useEffect(() => {
     const t = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000);
     return () => clearInterval(t);
   }, []);
 
-  // Breathing phase cycle.
   useEffect(() => {
-    const t = setTimeout(() => setPhase((p) => (p + 1) % PHASES.length), PHASES[phase].secs * 1000);
+    const t = setTimeout(
+      () => setPhase((p) => (p + 1) % PHASES.length),
+      PHASES[phase].secs * 1000,
+    );
     return () => clearTimeout(t);
   }, [phase]);
 
@@ -40,42 +43,43 @@ export default function UrgeOverlay({ onClose }: { onClose: () => void }) {
   const ss = String(remaining % 60).padStart(2, "0");
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-bg px-6 text-center">
-      <p className="text-sm uppercase tracking-widest text-muted">This will pass</p>
+    <div className="screen fixed inset-0 z-50 flex flex-col items-center overflow-y-auto bg-bg px-5 py-12 text-center">
+      <p className="t-label">This will pass</p>
 
       <div className="relative mt-12 flex h-56 w-56 items-center justify-center">
         <div
           className="absolute h-40 w-40 rounded-full bg-accent-soft"
           style={{
-            transform: reduced.current ? "scale(1)" : `scale(${current.scale + 0.4})`,
+            transform: reduced.current ? "scale(1)" : `scale(${current.scale + 0.45})`,
             transition: reduced.current ? "none" : `transform ${current.secs}s ease-in-out`,
           }}
         />
         <div className="relative z-10">
-          <div className="font-display text-3xl text-text">{current.label}</div>
-          <div className="mt-1 text-sm text-muted">{current.secs}s</div>
+          <div className="t-title">{current.label}</div>
+          <div className="t-subtitle mt-1 tnum">{current.secs}s</div>
         </div>
       </div>
 
-      <div className="mt-12 text-3xl font-semibold tabular-nums text-text">
+      <div className="mt-12 t-title tnum">
         {mm}:{ss}
       </div>
-      <p className="mt-1 text-sm text-muted">Stay for two minutes.</p>
+      <p className="t-caption mt-1">Stay for two minutes.</p>
 
-      <ul className="mt-10 w-full max-w-xs space-y-2 text-left">
-        {DISTRACTIONS.map((d) => (
-          <li key={d} className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-text">
-            {d}
-          </li>
-        ))}
-      </ul>
+      <div className="mt-10 w-full max-w-xs">
+        <Group>
+          {DISTRACTIONS.map((d) => (
+            <Row key={d}>
+              <span className="t-body">{d}</span>
+            </Row>
+          ))}
+        </Group>
+      </div>
 
-      <button
-        onClick={onClose}
-        className="mt-10 text-sm text-muted transition-colors hover:text-text"
-      >
-        {remaining === 0 ? "I'm okay now" : "Close"}
-      </button>
+      <div className="mt-10 w-full max-w-xs">
+        <Button variant="secondary" onClick={onClose}>
+          {remaining === 0 ? "I'm okay now" : "Close"}
+        </Button>
+      </div>
     </div>
   );
 }
