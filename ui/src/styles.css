@@ -64,20 +64,19 @@
   --color-accent-soft: var(--accent-soft);
   --color-accent-contrast: var(--accent-contrast);
   --color-danger: var(--danger);
-  --font-sans: "Inter Variable", -apple-system, "Segoe UI", system-ui, Roboto,
-    sans-serif;
-  --font-display: "Fraunces Variable", "Fraunces", Georgia, "Times New Roman",
-    serif;
+  --font-sans: "Inter Tight", "Segoe UI Variable", system-ui, sans-serif;
 }
 
-/* Characterful display face, used with restraint on calm statements only —
-   headlines, screen titles, the breathing prompt. Never on UI/data/body. */
+/* One family everywhere (Inter Tight). Hierarchy comes from weight + size,
+   SF-style — headers are simply bold, not a different typeface. */
 .font-display {
-  font-family: var(--font-display);
-  font-optical-sizing: auto;
-  font-variation-settings: "SOFT" 40, "WONK" 0;
-  letter-spacing: -0.01em;
-  font-weight: 460;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Numbers that change must not shift width. */
+.tnum {
+  font-variant-numeric: tabular-nums;
 }
 
 html,
@@ -91,6 +90,8 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
+  /* Inter's SF-style alternates: open digits + curved lowercase l. */
+  font-feature-settings: "cv05", "cv11";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
