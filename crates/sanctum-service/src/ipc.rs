@@ -34,11 +34,20 @@ const MAX_FRAME: usize = 1 << 20; // 1 MiB safety cap
 pub struct IpcHandler {
     resolver: Arc<Resolver>,
     db_path: PathBuf,
+    intervention: Arc<crate::intervention::InterventionCenter>,
 }
 
 impl IpcHandler {
-    pub fn new(resolver: Arc<Resolver>, db_path: PathBuf) -> Self {
-        Self { resolver, db_path }
+    pub fn new(
+        resolver: Arc<Resolver>,
+        db_path: PathBuf,
+        intervention: Arc<crate::intervention::InterventionCenter>,
+    ) -> Self {
+        Self {
+            resolver,
+            db_path,
+            intervention,
+        }
     }
 
     fn db(&self) -> anyhow::Result<Db> {
@@ -62,6 +71,19 @@ impl IpcHandler {
     }
 
     fn dispatch(&self, cmd: Command) -> anyhow::Result<Response> {
+        // Hot-path polls that never touch the DB (the UI calls PollIntervention
+        // roughly once a second).
+        match &cmd {
+            Command::PollIntervention => {
+                return Ok(Response::Intervention(self.intervention.poll()));
+            }
+            Command::TriggerIntervention => {
+                self.intervention.trigger_manual();
+                return Ok(Response::Ok);
+            }
+            _ => {}
+        }
+
         let db = self.db()?;
         let now = Utc::now();
         let lock = db.load_lock()?;
@@ -215,6 +237,11 @@ impl IpcHandler {
             Command::DeleteHistory => {
                 let count = db.delete_all_history()?;
                 Response::Deleted { count }
+            }
+
+            // Handled before the DB is opened (see top of dispatch).
+            Command::PollIntervention | Command::TriggerIntervention => {
+                unreachable!("intervention commands are handled on the hot path")
             }
         })
     }

@@ -5,6 +5,7 @@ pub mod dns;
 pub mod engine;
 pub mod firewall;
 pub mod hostsfile;
+pub mod intervention;
 pub mod ipc;
 pub mod lists;
 pub mod netcfg;

@@ -130,6 +130,27 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
 
     // 2. Build + bind the resolver. Binding is the anti-brick gate.
     let (resolver, block) = engine.build_resolver(upstreams)?;
+
+    // Block-moment intervention plumbing (v0.1.5 §A): the resolver emits each
+    // sinkholed adult-block host; one consumer task records the block (bumping
+    // the lifetime counter) and runs the debounce, arming interventions the UI
+    // polls for. A single task keeps DB writes serial.
+    let intervention = Arc::new(crate::intervention::InterventionCenter::new());
+    {
+        let (block_tx, mut block_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+        resolver.set_block_sink(block_tx);
+        let center = intervention.clone();
+        tokio::spawn(async move {
+            let db = Db::open(paths::db_path()).ok();
+            while let Some(host) = block_rx.recv().await {
+                if let Some(db) = &db {
+                    let _ = db.record_block(&host, "dns", chrono::Utc::now());
+                }
+                center.record_block(&host);
+            }
+        });
+    }
+
     let bound = engine.bind(&resolver).await;
 
     // Serve the UI over the named pipe (survives UI closure; the UI has no
@@ -138,6 +159,7 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
         let handler = Arc::new(crate::ipc::IpcHandler::new(
             resolver.clone(),
             paths::db_path(),
+            intervention.clone(),
         ));
         if let Err(e) = crate::ipc::spawn_server(handler, paths::PIPE_NAME.to_string()) {
             tracing::error!(error = %e, "failed to start ipc server");

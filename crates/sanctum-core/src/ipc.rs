@@ -45,6 +45,13 @@ pub enum Command {
     EnableProtection,
     /// Wipe the activity log immediately.
     DeleteHistory,
+    /// Poll for a pending block-moment intervention (v0.1.5 §A). The UI calls
+    /// this on a short interval; the reply also carries any "urges while you
+    /// were away" count to summarise quietly.
+    PollIntervention,
+    /// Open the intervention window on demand ("I need help now" / panic
+    /// hotkey). Always arms an intervention, even with no block event.
+    TriggerIntervention,
 }
 
 /// Responses from the service.
@@ -65,6 +72,8 @@ pub enum Response {
     Denied { reason: String },
     /// The command failed for an operational reason.
     Error { message: String },
+    /// The result of a `PollIntervention` (v0.1.5 §A).
+    Intervention(InterventionDto),
 }
 
 /// Everything the home screen needs, in one round-trip.
@@ -92,6 +101,20 @@ pub struct EventDto {
     pub ts: DateTime<Utc>,
     pub kind: String,
     pub detail: String,
+}
+
+/// A block-moment intervention poll result (v0.1.5 §A). Debounced service-side
+/// so browser DNS prefetch never triggers the window on its own.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct InterventionDto {
+    /// True when the intervention window should open now.
+    pub pending: bool,
+    /// The domain whose blocked lookups armed it (`None` for a manual/panic
+    /// trigger).
+    pub domain: Option<String>,
+    /// Interventions that fired while the UI wasn't polling — surfaced as a
+    /// quiet "urges happened while you were away" summary, then cleared.
+    pub urges_while_away: u32,
 }
 
 /// Encode any protocol value to bytes (JSON).

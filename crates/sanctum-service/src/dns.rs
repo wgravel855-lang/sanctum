@@ -21,7 +21,7 @@
 
 use std::collections::HashSet;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, OnceLock, RwLock};
 use std::time::Duration;
 
 use hickory_proto::op::{Message, MessageType, OpCode, Query, ResponseCode};
@@ -29,6 +29,7 @@ use hickory_proto::rr::rdata::{A, AAAA, CNAME};
 use hickory_proto::rr::{DNSClass, Name, RData, Record, RecordType};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, UdpSocket};
+use tokio::sync::mpsc;
 
 use sanctum_core::{domain, Blocklist, SafeSearchMap};
 
@@ -45,8 +46,16 @@ enum Decision {
     HealthCanary,
     DohDisableCanary,
     Forward,
-    Sink,
+    Sink(SinkKind),
     SafeSearch(String),
+}
+
+/// Which list produced a sink. Only adult-block hits are treated as "urges"
+/// for the intervention system; DoH-endpoint sinks are plumbing, not intent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SinkKind {
+    Blocked,
+    Doh,
 }
 
 /// The hot-reloadable filter lists + toggles.
@@ -86,9 +95,9 @@ impl FilterState {
         } else if self.is_allowed(host) {
             Decision::Forward
         } else if self.blocklist.is_blocked(host) {
-            Decision::Sink
+            Decision::Sink(SinkKind::Blocked)
         } else if self.block_doh && self.doh.is_blocked(host) {
-            Decision::Sink
+            Decision::Sink(SinkKind::Doh)
         } else if self.enforce_safesearch {
             match self.safesearch.lookup(host) {
                 Some(target) => Decision::SafeSearch(target.to_string()),
@@ -107,6 +116,9 @@ pub struct Resolver {
     pub sink_v4: Ipv4Addr,
     pub sink_v6: Ipv6Addr,
     pub upstream_timeout: Duration,
+    /// Optional sink for sinkholed adult-block hosts (v0.1.5 §A). Set once at
+    /// bring-up; `None` in tests and until wired.
+    block_tx: OnceLock<mpsc::UnboundedSender<String>>,
 }
 
 impl Resolver {
@@ -122,7 +134,13 @@ impl Resolver {
             sink_v4,
             sink_v6,
             upstream_timeout: Duration::from_secs(2),
+            block_tx: OnceLock::new(),
         }
+    }
+
+    /// Wire the block-event sink (v0.1.5 §A). Idempotent; the first caller wins.
+    pub fn set_block_sink(&self, tx: mpsc::UnboundedSender<String>) {
+        let _ = self.block_tx.set(tx);
     }
 
     /// Convenience constructor with default sinks and toggles.
@@ -174,7 +192,14 @@ impl Resolver {
                 resp.set_response_code(ResponseCode::NXDomain);
                 resp
             }
-            Decision::Sink => self.sink_response(&req, &q),
+            Decision::Sink(SinkKind::Blocked) => {
+                // A real adult-block hit: feed the intervention debouncer.
+                if let Some(tx) = self.block_tx.get() {
+                    let _ = tx.send(host.clone());
+                }
+                self.sink_response(&req, &q)
+            }
+            Decision::Sink(SinkKind::Doh) => self.sink_response(&req, &q),
             Decision::SafeSearch(target) => self.safesearch_response(&req, &q, &target).await,
         };
         response.to_vec().ok()
@@ -398,9 +423,9 @@ mod tests {
         let r = resolver();
         assert_eq!(r.classify("health.sanctum.invalid"), Decision::HealthCanary);
         assert_eq!(r.classify("use-application-dns.net"), Decision::DohDisableCanary);
-        assert_eq!(r.classify("bad.com"), Decision::Sink);
-        assert_eq!(r.classify("www.bad.com"), Decision::Sink);
-        assert_eq!(r.classify("dns.google"), Decision::Sink);
+        assert_eq!(r.classify("bad.com"), Decision::Sink(SinkKind::Blocked));
+        assert_eq!(r.classify("www.bad.com"), Decision::Sink(SinkKind::Blocked));
+        assert_eq!(r.classify("dns.google"), Decision::Sink(SinkKind::Doh));
         assert_eq!(
             r.classify("google.com"),
             Decision::SafeSearch("forcesafesearch.google.com".into())
@@ -411,7 +436,7 @@ mod tests {
     #[test]
     fn hot_reload_updates_and_allowlist_overrides() {
         let r = resolver();
-        assert_eq!(r.classify("ads.example.com"), Decision::Sink);
+        assert_eq!(r.classify("ads.example.com"), Decision::Sink(SinkKind::Blocked));
 
         // Reload with an allowlist entry -> now forwarded.
         let mut st = r.state.read().unwrap().clone();
@@ -423,6 +448,6 @@ mod tests {
         let mut st = r.state.read().unwrap().clone();
         st.blocklist.add("newbad.com");
         r.update(st);
-        assert_eq!(r.classify("sub.newbad.com"), Decision::Sink);
+        assert_eq!(r.classify("sub.newbad.com"), Decision::Sink(SinkKind::Blocked));
     }
 }

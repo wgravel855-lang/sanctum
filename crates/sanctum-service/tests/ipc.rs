@@ -24,7 +24,8 @@ async fn start(pipe: &str) -> TempDir {
         Blocklist::new(),
         vec![],
     ));
-    let handler = Arc::new(IpcHandler::new(resolver, db_path));
+    let intervention = Arc::new(sanctum_service::intervention::InterventionCenter::new());
+    let handler = Arc::new(IpcHandler::new(resolver, db_path, intervention));
     spawn_server(handler, pipe.to_string()).unwrap();
     dir
 }
@@ -62,6 +63,35 @@ async fn add_block_reflects_in_status() {
             assert!(s.all_browsers);
         }
         other => panic!("expected Status, got {other:?}"),
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn intervention_trigger_and_poll() {
+    let pipe = r"\\.\pipe\sanctum-test-ipc-intervene";
+    let _dir = start(pipe).await;
+
+    // No urge yet.
+    match call(pipe, Command::PollIntervention).await {
+        Response::Intervention(dto) => assert!(!dto.pending),
+        other => panic!("expected Intervention, got {other:?}"),
+    }
+
+    // "I need help now" / panic hotkey arms one unconditionally.
+    assert!(matches!(
+        call(pipe, Command::TriggerIntervention).await,
+        Response::Ok
+    ));
+
+    // The very next poll fires the window once...
+    match call(pipe, Command::PollIntervention).await {
+        Response::Intervention(dto) => assert!(dto.pending),
+        other => panic!("expected pending Intervention, got {other:?}"),
+    }
+    // ...and is then cleared (no repeat pop).
+    match call(pipe, Command::PollIntervention).await {
+        Response::Intervention(dto) => assert!(!dto.pending),
+        other => panic!("expected cleared Intervention, got {other:?}"),
     }
 }
 
