@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Does incognito mode actually hide anything? - Sanctum</title>
+    <meta name="description" content="Incognito mode hides less than most people think, and it will not get you past a proper content blocker. Here is what private browsing really does, and what it does not." />
+    <link rel="canonical" href="https://sanctum-renews-projects-f8d0ce91.vercel.app/blog/does-incognito-mode-hide-anything" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#0c0e0d" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="Does incognito mode actually hide anything?" />
+    <meta property="og:description" content="What private browsing really does, what it does not, and why it will not bypass a DNS-level blocker." />
+    <meta property="og:url" content="https://sanctum-renews-projects-f8d0ce91.vercel.app/blog/does-incognito-mode-hide-anything" />
+    <meta property="og:image" content="https://sanctum-renews-projects-f8d0ce91.vercel.app/og.svg" />
+    <script type="application/ld+json">
+      { "@context": "https://schema.org", "@type": "Article", "headline": "Does incognito mode actually hide anything?", "description": "What private browsing really does, what it does not, and why it will not bypass a DNS-level blocker.", "author": { "@type": "Organization", "name": "Sanctum" }, "publisher": { "@type": "Organization", "name": "Sanctum" }, "mainEntityOfPage": "https://sanctum-renews-projects-f8d0ce91.vercel.app/blog/does-incognito-mode-hide-anything" }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400..700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/blog.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <a class="back" href="/blog">&larr; Blog</a>
+      <h1>Does incognito mode actually hide anything?</h1>
+      <p class="meta">From the makers of Sanctum</p>
+
+      <p class="lede">Incognito mode has a reputation it did not earn. A lot of people reach for it thinking it makes them invisible, or thinking it is a back door around a blocker. It is neither. It is worth understanding exactly what it does, because the gap between the reputation and the reality is where people fool themselves.</p>
+
+      <h2>What it actually does</h2>
+      <p>Private or incognito windows do one narrow thing well: they do not save anything <em>on your device</em>. When you close the window, the browsing history, cookies, and form data from that session are wiped from the machine. That is genuinely useful for shared computers, logging into a second account, or not leaving a trail in your own history.</p>
+
+      <h2>What it does not do</h2>
+      <p>Here is the part the name oversells. Incognito does not make you invisible to anyone outside your own browser:</p>
+      <ul>
+        <li>Your <strong>network and DNS provider</strong> still see every site you look up, incognito or not.</li>
+        <li>Your <strong>employer or school</strong>, on their network, still see it.</li>
+        <li>The <strong>websites themselves</strong> still know you visited.</li>
+        <li>And crucially, anything filtering at the <strong>system level</strong> still applies.</li>
+      </ul>
+      <p>Incognito is local privacy, not invisibility. It hides your session from the next person to sit at your desk. It does not hide it from the internet.</p>
+
+      <h2>Why it will not get past a real blocker</h2>
+      <p>This is the one that matters if you are trying to keep a promise to yourself. A lot of blocking tools are browser extensions, and many extensions are disabled in incognito by default - so yes, an extension-based blocker often does nothing in a private window. That is a real weakness, and it is exactly why people try incognito first.</p>
+      <p>But a blocker that works below the browser does not care what window you are in. When a site is blocked at the DNS layer, the lookup fails before any connection is made - and a private window makes the exact same DNS lookup as a normal one. Incognito, regular, a different browser entirely: all of them ask the operating system to resolve the address, and if that resolution is filtered, they all hit the same wall.</p>
+
+      <div class="card">
+        <p style="margin: 0 0 10px"><strong>Sanctum</strong> filters at the DNS and HOSTS layers, underneath every browser at once - so Chrome, Edge, Firefox, and their private windows are all covered by the same block. There is no incognito loophole, because there is no browser setting involved. It is free, open source, and keeps working in the background.</p>
+        <a class="cta" href="https://github.com/wgravel855-lang/sanctum/releases/latest/download/Sanctum-Windows-Setup.exe">Get Sanctum for Windows</a>
+      </div>
+
+      <p>If part of you was hoping incognito would be the easy way around, that is worth noticing rather than judging - it is just the urge looking for a door. The good news is that a blocker worth using does not leave that door open in the first place.</p>
+
+      <p class="foot"><a href="/blog">More posts</a> &middot; <a href="/">Sanctum</a> &middot; <a href="/privacy">Privacy</a></p>
+    </div>
+  </body>
+</html>

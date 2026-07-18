@@ -2,8 +2,7 @@
   <rect width="1200" height="630" fill="#0c0e0d"/>
   <g transform="translate(130, 232)">
     <path d="M56 0 L108 20 V64 C108 96 84 120 56 135 C28 120 4 96 4 64 V20 Z" fill="#8fbca5"/>
-    <rect x="42" y="46" width="10" height="37" rx="5" fill="#0c0e0d"/>
-    <rect x="60" y="46" width="10" height="37" rx="5" fill="#0c0e0d"/>
+    <path d="M36 66 l14 14 l26 -30" fill="none" stroke="#0c0e0d" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
   <text x="290" y="300" fill="#eef1ee" font-size="94" font-weight="700" letter-spacing="-3">Sanctum</text>
   <text x="293" y="368" fill="#97a19a" font-size="39" font-weight="400">The block you can't talk yourself out of.</text>
