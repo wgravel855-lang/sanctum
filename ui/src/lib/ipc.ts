@@ -16,6 +16,7 @@ export function inTauri(): boolean {
 
 const mockStatus: Status = {
   protection_active: true,
+  blocking_now: true,
   degraded: false,
   total_blocked: 14382,
   protected_days: 27,

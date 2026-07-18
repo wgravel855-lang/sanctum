@@ -15,13 +15,18 @@ export default function Home({
   onNavigate: (s: Screen) => void;
   onUrge: () => void;
 }) {
-  const active = !!status?.protection_active && !status?.degraded;
   const degraded = !!status?.degraded;
+  const blockingNow = !!status?.blocking_now && !degraded;
+  // Master switch on, but the schedule says this isn't a protected window.
+  const scheduledPause = !!status?.protection_active && !status?.blocking_now && !degraded;
+  const active = blockingNow;
   const headline = degraded
     ? "Protection is degraded"
-    : active
+    : blockingNow
       ? "Protection is active"
-      : "Protection is off";
+      : scheduledPause
+        ? "Paused by schedule"
+        : "Protection is off";
 
   const blocked = useCountUp(status?.total_blocked ?? 0);
 
@@ -37,9 +42,11 @@ export default function Home({
       <p className="t-caption mt-1">
         {degraded
           ? "HOSTS-only while the resolver recovers"
-          : status?.all_browsers
-            ? "All browsers protected"
-            : "Some browsers unprotected"}
+          : scheduledPause
+            ? "Outside your scheduled hours"
+            : blockingNow
+              ? "All browsers protected"
+              : "Protection is off"}
       </p>
 
       {status?.locked && (
@@ -53,7 +60,7 @@ export default function Home({
         <ControlButton
           icon={<ShieldIcon />}
           label="Protection"
-          sublabel={active ? "On" : degraded ? "Degraded" : "Off"}
+          sublabel={blockingNow ? "On" : scheduledPause ? "Scheduled" : degraded ? "Degraded" : "Off"}
           onClick={() => onNavigate("protection")}
         />
         <ControlButton

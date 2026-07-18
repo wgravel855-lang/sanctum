@@ -87,8 +87,11 @@ pub enum Response {
 /// Everything the home screen needs, in one round-trip.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Status {
-    /// Whether filtering is currently being enforced.
+    /// The master switch (what the Protection toggle reflects).
     pub protection_active: bool,
+    /// Whether filtering is enforced *right now* — the master switch AND the
+    /// schedule agreeing this is a protected moment. Drives the home display.
+    pub blocking_now: bool,
     /// True when running in HOSTS-only degraded mode.
     pub degraded: bool,
     /// Lifetime count of blocked lookups ("N harmful sites blocked").

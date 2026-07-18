@@ -15,6 +15,7 @@ export type Schedule =
 
 export interface Status {
   protection_active: boolean;
+  blocking_now: boolean;
   degraded: boolean;
   total_blocked: number;
   protected_days: number;

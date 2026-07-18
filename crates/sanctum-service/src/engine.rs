@@ -236,10 +236,12 @@ fn build_canary_query() -> Vec<u8> {
 pub fn filter_state_from_db(db: &Db) -> anyhow::Result<(FilterState, Blocklist)> {
     let cfg = db.load_config()?;
 
-    // Protection off means OFF: the resolver forwards everything and the HOSTS
-    // floor is emptied (an empty blocklist writes an empty floor). Without this
-    // the toggle was purely cosmetic — the sinkhole and floor kept blocking.
-    if !cfg.protection_enabled {
+    // OFF means OFF: the resolver forwards everything and the HOSTS floor is
+    // emptied (an empty blocklist writes an empty floor). Blocking is enforced
+    // only when the master switch is on AND the schedule says this moment is a
+    // protected window (always-on, an active custom window, or a running focus
+    // session). Re-evaluated every reconcile tick as time passes.
+    if !cfg.protection_enabled || !cfg.schedule.is_active_at(chrono::Local::now()) {
         let empty = Blocklist::new();
         let mut state = FilterState::new(empty.clone(), lists::safesearch_map(), Blocklist::new());
         state.enforce_safesearch = false;

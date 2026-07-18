@@ -267,8 +267,11 @@ impl IpcHandler {
 
     fn status(&self, db: &Db, lock: &LockState, locked: bool) -> anyhow::Result<Status> {
         let cfg = db.load_config()?;
+        let blocking_now =
+            cfg.protection_enabled && cfg.schedule.is_active_at(chrono::Local::now());
         Ok(Status {
             protection_active: cfg.protection_enabled,
+            blocking_now,
             degraded: false,
             total_blocked: db.total_blocks()?,
             protected_days: db.total_protected_days()?,

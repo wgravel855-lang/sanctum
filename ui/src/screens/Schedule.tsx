@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Schedule as ScheduleType, Status } from "../lib/types";
 import { sendCommand } from "../lib/ipc";
 import TopBar from "../components/TopBar";
@@ -10,7 +10,7 @@ type Mode = "always_on" | "windows" | "focus" | "off";
 
 const MODES: { key: Mode; label: string; desc: string }[] = [
   { key: "always_on", label: "Always on", desc: "Enforced 24/7." },
-  { key: "windows", label: "Nightly window", desc: "e.g. 9:00 PM–6:00 AM, when you're most vulnerable." },
+  { key: "windows", label: "Custom hours", desc: "Block on the days and times you choose." },
   { key: "focus", label: "Focus session", desc: "A one-off block for a set stretch of time." },
   { key: "off", label: "Off", desc: "No schedule (protection can still be on manually)." },
 ];
@@ -44,20 +44,29 @@ export default function Schedule({
   const [mode, setMode] = useState<Mode>("always_on");
   const [start, setStart] = useState("21:00");
   const [end, setEnd] = useState("06:00");
+  const [days, setDays] = useState<number[]>([]); // 0=Mon..6=Sun; empty = every day
   const [focusMins, setFocusMins] = useState(60);
   const [password, setPassword] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Initialise the form from the saved schedule ONCE. Re-running on every
+  // status poll would wipe the user's in-progress edits every few seconds.
+  const initialized = useRef(false);
   useEffect(() => {
-    if (!status) return;
+    if (!status || initialized.current) return;
+    initialized.current = true;
     const s = status.schedule;
     setMode(s.mode);
     if (s.mode === "windows" && s.windows[0]) {
       setStart(minToTime(s.windows[0].start_min));
       setEnd(minToTime(s.windows[0].end_min));
+      setDays(s.windows[0].days ?? []);
     }
   }, [status]);
+
+  const toggleDay = (d: number) =>
+    setDays((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d].sort((a, b) => a - b)));
 
   const build = (): ScheduleType => {
     switch (mode) {
@@ -66,7 +75,7 @@ export default function Schedule({
       case "off":
         return { mode: "off" };
       case "windows":
-        return { mode: "windows", windows: [{ start_min: timeToMin(start), end_min: timeToMin(end), days: [] }] };
+        return { mode: "windows", windows: [{ start_min: timeToMin(start), end_min: timeToMin(end), days }] };
       case "focus":
         return { mode: "focus", ends_at: new Date(Date.now() + focusMins * 60_000).toISOString() };
     }
@@ -118,7 +127,29 @@ export default function Schedule({
               <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="field mt-1" />
             </label>
           </div>
-          <GroupFootnote>Overnight windows (like 9:00 PM–6:00 AM) are supported.</GroupFootnote>
+          <div className="mt-6">
+            <GroupLabel>Days</GroupLabel>
+            <div className="flex gap-1.5">
+              {["M", "T", "W", "T", "F", "S", "S"].map((label, d) => {
+                const on = days.includes(d);
+                return (
+                  <button
+                    key={d}
+                    onClick={() => toggleDay(d)}
+                    className={`pressable flex-1 rounded-[10px] py-2.5 text-[13px] font-medium ${
+                      on ? "bg-accent text-accent-text" : "bg-surface-1 text-text-2"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <GroupFootnote>
+            {days.length === 0 ? "Every day. " : ""}Tap days to limit the window. Overnight windows
+            (like 9:00 PM–6:00 AM) are supported.
+          </GroupFootnote>
         </div>
       )}
 
