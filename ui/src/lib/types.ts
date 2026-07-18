@@ -36,6 +36,7 @@ export interface EventDto {
 export type Command =
   | { cmd: "get_status" }
   | { cmd: "recent_events"; limit: number }
+  | { cmd: "list_custom_blocks" }
   | { cmd: "add_block"; domain: string }
   | { cmd: "remove_block"; domain: string; password: string }
   | { cmd: "add_allow"; domain: string; password: string }
@@ -52,6 +53,7 @@ export type Command =
 export type Response =
   | { resp: "status"; body: Status }
   | { resp: "events"; body: EventDto[] }
+  | { resp: "custom_blocks"; body: string[] }
   | { resp: "deleted"; body: { count: number } }
   | { resp: "ok" }
   | { resp: "denied"; body: { reason: string } }

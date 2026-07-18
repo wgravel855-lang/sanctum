@@ -54,8 +54,20 @@ impl IpcHandler {
         Ok(Db::open(&self.db_path)?)
     }
 
-    fn reload(&self, db: &Db) -> anyhow::Result<()> {
-        engine::reload_resolver(db, &self.resolver)?;
+    /// Apply the current DB state to live enforcement immediately: reload the
+    /// resolver, refresh the HOSTS floor to match (an emptied list clears it),
+    /// and flush cached DNS so a removed/unblocked site stops resolving to the
+    /// sinkhole right away — not on the next reconcile tick, and not from a
+    /// stale OS cache.
+    fn apply_enforcement(&self, db: &Db) -> anyhow::Result<()> {
+        // Reloading the resolver is the authoritative change and must succeed.
+        let block = engine::reload_resolver(db, &self.resolver)?;
+        // The HOSTS-floor refresh and cache flush are best-effort: a transient
+        // write failure must not fail the command, and the reconcile loop
+        // reasserts the floor regardless.
+        let engine = crate::engine::EnforcementEngine::new();
+        let _ = engine.apply_floor(&block);
+        let _ = crate::netcfg::flush_dns_cache();
         Ok(())
     }
 
@@ -105,10 +117,12 @@ impl IpcHandler {
                 Response::Events(events)
             }
 
+            Command::ListCustomBlocks => Response::CustomBlocks(db.list_custom_block()?),
+
             // Grow-only: always allowed, even while locked.
             Command::AddBlock { domain } => {
                 db.add_custom_block(&domain, now)?;
-                self.reload(&db)?;
+                self.apply_enforcement(&db)?;
                 db.record_event("block_add", &domain, now)?;
                 Response::Ok
             }
@@ -121,7 +135,7 @@ impl IpcHandler {
                     return Ok(denied("Incorrect password."));
                 }
                 db.remove_custom_block(&domain)?;
-                self.reload(&db)?;
+                self.apply_enforcement(&db)?;
                 Response::Ok
             }
 
@@ -134,13 +148,13 @@ impl IpcHandler {
                     return Ok(denied("Incorrect password."));
                 }
                 db.add_allow(&domain, now)?;
-                self.reload(&db)?;
+                self.apply_enforcement(&db)?;
                 Response::Ok
             }
 
             Command::RemoveAllow { domain } => {
                 db.remove_allow(&domain)?;
-                self.reload(&db)?;
+                self.apply_enforcement(&db)?;
                 Response::Ok
             }
 
@@ -222,6 +236,7 @@ impl IpcHandler {
                 let mut cfg = db.load_config()?;
                 cfg.protection_enabled = false;
                 db.save_config(&cfg)?;
+                self.apply_enforcement(&db)?; // stop sinkholing + clear floor + flush
                 db.record_event("protection_disabled", "", now)?;
                 Response::Ok
             }
@@ -230,6 +245,7 @@ impl IpcHandler {
                 let mut cfg = db.load_config()?;
                 cfg.protection_enabled = true;
                 db.save_config(&cfg)?;
+                self.apply_enforcement(&db)?; // re-arm blocking + floor + flush
                 db.record_event("protection_enabled", "", now)?;
                 Response::Ok
             }

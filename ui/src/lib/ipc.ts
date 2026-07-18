@@ -40,6 +40,7 @@ let mockEvents: EventDto[] = (() => {
   return evs;
 })();
 let mockPassword: string | null = null;
+let mockCustomBlocks: string[] = ["distracting-site.net", "one-more-thing.com"];
 
 function gate(password: string): boolean {
   return mockPassword === null || mockPassword === password;
@@ -56,8 +57,22 @@ async function mockCommand(cmd: Command): Promise<Response> {
       mockEvents = [];
       return { resp: "deleted", body: { count } };
     }
+    case "list_custom_blocks":
+      return { resp: "custom_blocks", body: [...mockCustomBlocks] };
     case "add_block":
-      mockStatus.blocklist_count += 1;
+      if (!mockCustomBlocks.includes(cmd.domain)) {
+        mockCustomBlocks.push(cmd.domain);
+        mockStatus.blocklist_count += 1;
+      }
+      return { resp: "ok" };
+    case "remove_block":
+      if (mockStatus.locked)
+        return { resp: "denied", body: { reason: "The block list can only grow during a locked session." } };
+      if (!gate(cmd.password)) return { resp: "denied", body: { reason: "Incorrect password." } };
+      if (mockCustomBlocks.includes(cmd.domain)) {
+        mockCustomBlocks = mockCustomBlocks.filter((d) => d !== cmd.domain);
+        mockStatus.blocklist_count -= 1;
+      }
       return { resp: "ok" };
     case "start_lock":
       mockStatus.locked = true;
@@ -104,4 +119,9 @@ export async function sendCommand(cmd: Command): Promise<Response> {
 export async function recentEvents(limit = 50): Promise<EventDto[]> {
   const r = await sendCommand({ cmd: "recent_events", limit });
   return r.resp === "events" ? r.body : [];
+}
+
+export async function listCustomBlocks(): Promise<string[]> {
+  const r = await sendCommand({ cmd: "list_custom_blocks" });
+  return r.resp === "custom_blocks" ? r.body : [];
 }

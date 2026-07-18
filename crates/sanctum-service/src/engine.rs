@@ -235,6 +235,18 @@ fn build_canary_query() -> Vec<u8> {
 /// from config. Free function so the IPC handler can reuse it with any DB.
 pub fn filter_state_from_db(db: &Db) -> anyhow::Result<(FilterState, Blocklist)> {
     let cfg = db.load_config()?;
+
+    // Protection off means OFF: the resolver forwards everything and the HOSTS
+    // floor is emptied (an empty blocklist writes an empty floor). Without this
+    // the toggle was purely cosmetic — the sinkhole and floor kept blocking.
+    if !cfg.protection_enabled {
+        let empty = Blocklist::new();
+        let mut state = FilterState::new(empty.clone(), lists::safesearch_map(), Blocklist::new());
+        state.enforce_safesearch = false;
+        state.block_doh = false;
+        return Ok((state, empty));
+    }
+
     let mut block = lists::starter_blocklist();
     for d in db.list_custom_block()? {
         block.add(&d);

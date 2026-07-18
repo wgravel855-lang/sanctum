@@ -18,6 +18,9 @@ pub enum Command {
     GetStatus,
     /// Recent activity-log entries (most recent first).
     RecentEvents { limit: u32 },
+    /// The user-added (custom) blocked domains, for the remove UI. The embedded
+    /// starter list is not returned — it is the built-in baseline.
+    ListCustomBlocks,
     /// Add a domain to the block list. Always allowed (grow-only).
     AddBlock { domain: String },
     /// Remove a blocked domain. Refused while locked; else password-gated.
@@ -64,6 +67,8 @@ pub enum Command {
 pub enum Response {
     Status(Status),
     Events(Vec<EventDto>),
+    /// The user's custom (removable) blocked domains.
+    CustomBlocks(Vec<String>),
     /// A history wipe report (rows deleted).
     Deleted { count: usize },
     /// The command succeeded.

@@ -129,7 +129,7 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
     let upstreams = engine.compute_upstreams(&journal);
 
     // 2. Build + bind the resolver. Binding is the anti-brick gate.
-    let (resolver, block) = engine.build_resolver(upstreams)?;
+    let (resolver, mut block) = engine.build_resolver(upstreams)?;
 
     // Block-moment intervention plumbing (v0.1.5 §A): the resolver emits each
     // sinkholed adult-block host; one consumer task records the block (bumping
@@ -212,6 +212,13 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
         ticks += 1;
         if ticks >= RECONCILE_SECS {
             ticks = 0;
+            // Re-read the effective blocklist so a protection toggle or list
+            // edit propagates to BOTH the resolver and the HOSTS floor (and an
+            // emptied list clears the floor), instead of reasserting a stale
+            // startup snapshot.
+            if let Ok(fresh) = engine.reload(&resolver) {
+                block = fresh;
+            }
             engine.apply_floor(&block).ok();
 
             let now_serving = engine.self_verify().await;
