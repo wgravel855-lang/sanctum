@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>How to block adult sites on Windows (free, private, no spyware) - Sanctum</title>
+    <meta name="description" content="The real ways to block adult content on Windows - HOSTS file, DNS, router, extensions, and apps - with honest trade-offs, plus a free, open-source method that covers every browser including incognito." />
+    <link rel="canonical" href="https://sanctum-renews-projects-f8d0ce91.vercel.app/blog/how-to-block-adult-sites-on-windows" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#0c0e0d" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="How to block adult sites on Windows (free, private, no spyware)" />
+    <meta property="og:description" content="The real options and their trade-offs, plus a free open-source way that covers every browser." />
+    <meta property="og:url" content="https://sanctum-renews-projects-f8d0ce91.vercel.app/blog/how-to-block-adult-sites-on-windows" />
+    <meta property="og:image" content="https://sanctum-renews-projects-f8d0ce91.vercel.app/og.svg" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": "How to block adult sites on Windows (free, private, no spyware)",
+        "description": "The real ways to block adult content on Windows, their trade-offs, and a free open-source method that covers every browser.",
+        "author": { "@type": "Organization", "name": "Sanctum" },
+        "publisher": { "@type": "Organization", "name": "Sanctum" },
+        "mainEntityOfPage": "https://sanctum-renews-projects-f8d0ce91.vercel.app/blog/how-to-block-adult-sites-on-windows"
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400..700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/blog.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <a class="back" href="/blog">&larr; Blog</a>
+      <h1>How to block adult sites on Windows (free, private, no spyware)</h1>
+      <p class="meta">A practical guide from the makers of Sanctum</p>
+
+      <p class="lede">If you have decided you want adult content off your computer, the hard part is not the decision - it is making it stick across every browser, including the moment you most want to undo it. Here are the real options on Windows, honestly, with their trade-offs.</p>
+
+      <h2>1. The Windows HOSTS file</h2>
+      <p>The HOSTS file lets you point specific domains at a dead address so they never load. It is free and built in. But it only matches exact domains you list by hand, it does not cover subdomains or the endless list of sites, and anyone can open it in Notepad and delete a line in ten seconds. It is a start, not a solution.</p>
+
+      <h2>2. DNS filtering</h2>
+      <p>Every site your browser visits starts with a DNS lookup. Point your computer at a filtering DNS resolver and blocked lookups fail before a connection is ever made - and because this happens below the browser, it covers Chrome, Edge, Firefox, and their private windows at once. The catch: system DNS settings are easy to switch back, and some browsers quietly use their own encrypted DNS (DoH) that skips your settings entirely unless it is contained.</p>
+
+      <h2>3. Your router</h2>
+      <p>Filtering at the router covers every device on your home network. But it does nothing the moment you are on mobile data or another Wi-Fi network, laptops travel, and router settings are one login away from being turned off.</p>
+
+      <h2>4. Browser extensions</h2>
+      <p>Extensions are easy to install but easy to remove, they only protect the browser they are installed in, and most do nothing in incognito or a different browser. Convenient, but thin.</p>
+
+      <h2>5. Dedicated blocking apps</h2>
+      <p>Purpose-built apps do the most: system-wide filtering, a background service that keeps working, and a way to lock the settings so you cannot casually undo them. The things to watch for are cost, and whether the app is honest about what it does - some accountability tools quietly monitor and report your activity, which is a privacy trade you should make on purpose, not by accident.</p>
+
+      <h2>What actually makes a blocker hold</h2>
+      <p>Cutting through all of it, a blocker that works has four properties:</p>
+      <ul>
+        <li><strong>It covers every browser</strong>, including private windows, because it filters below the browser.</li>
+        <li><strong>It keeps working in the background</strong>, so closing an app or killing a process does not switch it off.</li>
+        <li><strong>It can outlast a craving.</strong> The barrier only has to be harder to remove than the urge is to wait out - urges pass in minutes.</li>
+        <li><strong>It is honest and private.</strong> It should tell you plainly how it can be removed, and it should not send your browsing anywhere.</li>
+      </ul>
+
+      <div class="card">
+        <p style="margin: 0 0 10px"><strong>Sanctum</strong> is a free, open-source Windows app built around exactly those four properties. It filters every browser at the DNS and HOSTS layers, runs as a background service with a watchdog, and can lock its own settings for a chosen stretch so a 2am impulse cannot undo a clear-headed decision. It collects nothing - no account, no telemetry - and because it is open source you can verify that yourself.</p>
+        <a class="cta" href="https://github.com/wgravel855-lang/sanctum/releases/latest/download/Sanctum-Windows-Setup.exe">Get Sanctum for Windows</a>
+      </div>
+
+      <p>It is deliberately honest about its own limits, too: an administrator can still remove it by booting into Safe Mode. That is on purpose. The point is not to trap you on your own machine - it is to add enough friction to outlast the urge, and to move the real decision to a calm moment when your head is clear.</p>
+
+      <p class="foot"><a href="/blog">More posts</a> &middot; <a href="/">Sanctum</a> &middot; <a href="/privacy">Privacy</a></p>
+    </div>
+  </body>
+</html>

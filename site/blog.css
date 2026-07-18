@@ -1,0 +1,41 @@
+:root {
+  --bg: #0c0e0d;
+  --surface: #151917;
+  --line: rgba(255, 255, 255, 0.09);
+  --text: #eef1ee;
+  --muted: #97a19a;
+  --accent: #8fc7ac;
+  --font: "Inter Tight", -apple-system, "Segoe UI", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 720px; margin: 0 auto; padding: 64px 24px 96px; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.back { color: var(--muted); font-size: 15px; }
+h1 { font-size: clamp(2rem, 5vw, 2.8rem); font-weight: 640; letter-spacing: -0.022em; line-height: 1.12; margin: 24px 0 10px; }
+h2 { font-size: 1.4rem; font-weight: 620; letter-spacing: -0.01em; margin: 44px 0 10px; }
+.meta { color: var(--muted); font-size: 14px; margin: 0 0 34px; }
+.lede { color: var(--muted); font-size: 20px; line-height: 1.6; margin: 0 0 36px; }
+p { margin: 0 0 18px; }
+li { margin: 0 0 10px; }
+ul, ol { padding-left: 22px; }
+strong { font-weight: 560; color: var(--text); }
+.cta { display: inline-block; background: var(--accent); color: #0a0d0b; font-weight: 560; padding: 13px 22px; border-radius: 999px; margin: 14px 0; }
+.cta:hover { text-decoration: none; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; margin: 28px 0; }
+.foot { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+.post-list { list-style: none; padding: 0; margin: 34px 0 0; }
+.post-list li { margin: 0 0 12px; }
+.post-list a { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; color: var(--text); }
+.post-list a:hover { border-color: var(--accent); text-decoration: none; }
+.post-title { font-size: 1.2rem; font-weight: 600; letter-spacing: -0.01em; }
+.post-desc { color: var(--muted); font-size: 15px; margin-top: 4px; }
