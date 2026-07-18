@@ -269,8 +269,30 @@
         place-items: center;
         color: var(--accent);
         box-shadow:
-          0 0 44px -12px rgba(143, 188, 165, 0.35),
+          0 0 44px -12px rgba(143, 188, 165, 0.32),
           inset 0 0 30px -18px rgba(143, 188, 165, 0.4);
+        animation: breathe 7s ease-in-out infinite;
+        will-change: transform;
+      }
+      @keyframes breathe {
+        0%,
+        100% {
+          transform: scale(1);
+          box-shadow:
+            0 0 40px -14px rgba(143, 188, 165, 0.26),
+            inset 0 0 30px -18px rgba(143, 188, 165, 0.36);
+        }
+        50% {
+          transform: scale(1.045);
+          box-shadow:
+            0 0 62px -10px rgba(143, 188, 165, 0.5),
+            inset 0 0 26px -14px rgba(143, 188, 165, 0.55);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .ring {
+          animation: none;
+        }
       }
       .ring svg {
         width: 52px;
