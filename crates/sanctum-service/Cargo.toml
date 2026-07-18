@@ -25,7 +25,7 @@ serde_json = { workspace = true }
 chrono = { workspace = true }
 hickory-proto = "0.25.2"
 windows-service = "0.8.1"
-windows = { version = "0.61.3", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_Networking_WinSock", "Win32_Storage_FileSystem", "Win32_UI_WindowsAndMessaging", "Win32_NetworkManagement_WindowsFilteringPlatform", "Win32_System_Services", "Win32_Security", "Win32_System_Rpc", "Win32_System_Threading"] }
+windows = { version = "0.61.3", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_Networking_WinSock", "Win32_Storage_FileSystem", "Win32_UI_WindowsAndMessaging", "Win32_NetworkManagement_WindowsFilteringPlatform", "Win32_System_Services", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Rpc", "Win32_System_Threading"] }
 winreg = "0.56.0"
 
 # DNS wire parsing/building for the sinkhole resolver.

@@ -17,6 +17,14 @@ use sanctum_core::config::{self, LockState};
 use sanctum_core::ipc::{Command, EventDto, Response, Status};
 use sanctum_core::{ipc as proto, Db};
 
+use std::ffi::c_void;
+use std::sync::OnceLock;
+use windows::core::{BOOL, PCWSTR};
+use windows::Win32::Security::Authorization::{
+    ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
+};
+use windows::Win32::Security::{PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES};
+
 use crate::dns::Resolver;
 use crate::engine;
 
@@ -248,14 +256,73 @@ fn check_password(db: &Db, pw: &str) -> anyhow::Result<bool> {
 // Transport
 // ---------------------------------------------------------------------------
 
+/// DACL granting Authenticated Users read+write on the pipe, with SYSTEM and
+/// Administrators full control. Without an explicit descriptor, a pipe created
+/// by the LocalSystem service inherits a default DACL that denies the
+/// unprivileged UI — so the client's `CreateFile` fails with access-denied and
+/// the app can't reach the service at all.
+const PIPE_SDDL: &str = "D:(A;;GRGW;;;AU)(A;;FA;;;SY)(A;;FA;;;BA)";
+
+/// Pointer to the pipe's security descriptor, built once from [`PIPE_SDDL`] and
+/// reused for every instance. Stored as `usize` so the `OnceLock` is `Send +
+/// Sync`; the descriptor is immutable after construction and lives for the
+/// whole process (freed by the OS at exit), so no per-instance alloc/free is
+/// needed. `0` means the descriptor couldn't be built.
+static PIPE_SD: OnceLock<usize> = OnceLock::new();
+
+fn pipe_security_descriptor() -> Option<*mut c_void> {
+    let ptr = *PIPE_SD.get_or_init(|| unsafe {
+        let wide: Vec<u16> = PIPE_SDDL.encode_utf16().chain(std::iter::once(0)).collect();
+        let mut psd = PSECURITY_DESCRIPTOR::default();
+        match ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            PCWSTR(wide.as_ptr()),
+            SDDL_REVISION_1,
+            &mut psd,
+            None,
+        ) {
+            Ok(()) => psd.0 as usize,
+            Err(e) => {
+                tracing::error!(error = %e, "failed to build pipe security descriptor");
+                0
+            }
+        }
+    });
+    (ptr != 0).then_some(ptr as *mut c_void)
+}
+
+/// Create one pipe instance whose DACL admits the unprivileged UI. `first` sets
+/// `first_pipe_instance` for the very first instance. Falls back to the default
+/// (admin-only) DACL if the descriptor can't be built, so the service still
+/// runs rather than failing to start.
+fn create_pipe(pipe_name: &str, first: bool) -> std::io::Result<NamedPipeServer> {
+    let mut opts = ServerOptions::new();
+    opts.reject_remote_clients(true);
+    if first {
+        opts.first_pipe_instance(true);
+    }
+    match pipe_security_descriptor() {
+        Some(sd) => {
+            let mut sa = SECURITY_ATTRIBUTES {
+                nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+                lpSecurityDescriptor: sd,
+                bInheritHandle: BOOL(0),
+            };
+            unsafe {
+                opts.create_with_security_attributes_raw(
+                    pipe_name,
+                    &mut sa as *mut SECURITY_ATTRIBUTES as *mut c_void,
+                )
+            }
+        }
+        None => opts.create(pipe_name),
+    }
+}
+
 /// Create the first pipe instance (so the pipe exists immediately) and spawn
 /// the accept loop. Must be called from within a Tokio runtime. Returns once
 /// the pipe is bound, eliminating any client startup race.
 pub fn spawn_server(handler: Arc<IpcHandler>, pipe_name: String) -> std::io::Result<()> {
-    let first = ServerOptions::new()
-        .first_pipe_instance(true)
-        .reject_remote_clients(true)
-        .create(&pipe_name)?;
+    let first = create_pipe(&pipe_name, true)?;
     tokio::spawn(async move {
         if let Err(e) = serve_loop(handler, pipe_name, first).await {
             tracing::error!(error = %e, "ipc server stopped");
@@ -267,10 +334,7 @@ pub fn spawn_server(handler: Arc<IpcHandler>, pipe_name: String) -> std::io::Res
 /// Serve the named pipe forever, one instance per client, dispatching each
 /// framed command through `handler`.
 pub async fn serve(handler: Arc<IpcHandler>, pipe_name: String) -> anyhow::Result<()> {
-    let first = ServerOptions::new()
-        .first_pipe_instance(true)
-        .reject_remote_clients(true)
-        .create(&pipe_name)?;
+    let first = create_pipe(&pipe_name, true)?;
     serve_loop(handler, pipe_name, first).await
 }
 
@@ -284,9 +348,7 @@ async fn serve_loop(
         server.connect().await?;
         let connected = server;
         // Immediately stand up the next instance so no client is refused.
-        server = ServerOptions::new()
-            .reject_remote_clients(true)
-            .create(&pipe_name)?;
+        server = create_pipe(&pipe_name, false)?;
 
         let h = handler.clone();
         tokio::spawn(async move {
