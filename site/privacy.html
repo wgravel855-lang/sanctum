@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy - Sanctum</title>
+    <meta name="description" content="Sanctum collects nothing. No account, no telemetry, no analytics, no server. Everything stays on your PC." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400..700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #0c0e0d;
+        --surface: #151917;
+        --line: rgba(255, 255, 255, 0.09);
+        --text: #eef1ee;
+        --muted: #97a19a;
+        --accent: #8fc7ac;
+        --font: "Inter Tight", -apple-system, "Segoe UI", system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 17px;
+        line-height: 1.7;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 720px; margin: 0 auto; padding: 72px 24px 96px; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .back { color: var(--muted); font-size: 15px; }
+      h1 { font-size: clamp(2rem, 5vw, 2.6rem); font-weight: 640; letter-spacing: -0.022em; margin: 28px 0 6px; }
+      .lede { color: var(--muted); font-size: 19px; margin: 0 0 40px; }
+      h2 { font-size: 1.25rem; font-weight: 620; letter-spacing: -0.01em; margin: 40px 0 8px; }
+      p { margin: 0 0 16px; }
+      .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; margin: 24px 0; }
+      .muted { color: var(--muted); }
+      .foot { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <a class="back" href="/">&larr; Sanctum</a>
+      <h1>Privacy</h1>
+      <p class="lede">Sanctum collects nothing. There is no account, no telemetry, no analytics, and no server that ever sees your activity.</p>
+
+      <h2>What stays on your PC</h2>
+      <p>Your block list, schedule, streak, urge history, and settings live only in a local database on your own computer (in ProgramData). They are never uploaded and never leave the machine.</p>
+
+      <h2>What leaves your PC</h2>
+      <p>Only DNS. Sanctum runs a local DNS resolver; lookups it does not block are forwarded to the DNS provider your system already uses, exactly as before. Sanctum does not log, store, or transmit the sites you visit.</p>
+
+      <h2>Block-list updates</h2>
+      <p>If you choose to point Sanctum at a block-list URL, it fetches that list over HTTPS from the address you configured, and from nowhere else. Out of the box it uses the small starter list bundled with the app.</p>
+
+      <h2>No third parties, no cookies, no tracking</h2>
+      <p>Sanctum is a desktop app, not a web service. It contains no advertising, no third-party SDKs, and no tracking of any kind.</p>
+
+      <div class="card">
+        <p style="margin:0"><strong>Verify it yourself.</strong> Sanctum is open source under the GPLv3. You can read every line and confirm there are no network calls beyond the DNS it filters. The README even shows the exact commands to prove it.</p>
+      </div>
+
+      <h2>This website</h2>
+      <p>The page you are reading is served as static files (via Vercel). We add no analytics or trackers to it. As with any website, the host may keep standard request logs at its own level; nothing Sanctum-specific is collected.</p>
+
+      <h2>Questions</h2>
+      <p>See the <a href="/contact">contact page</a>.</p>
+
+      <p class="foot">Sanctum is free and open source. This policy applies to the Sanctum desktop app and this website. Last updated July 2026.</p>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contact - Sanctum</title>
+    <meta name="description" content="Get in touch about Sanctum, the free, open-source Windows content blocker." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400..700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #0c0e0d;
+        --surface: #151917;
+        --line: rgba(255, 255, 255, 0.09);
+        --text: #eef1ee;
+        --muted: #97a19a;
+        --accent: #8fc7ac;
+        --font: "Inter Tight", -apple-system, "Segoe UI", system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        font-size: 17px;
+        line-height: 1.7;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 720px; margin: 0 auto; padding: 72px 24px 96px; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .back { color: var(--muted); font-size: 15px; }
+      h1 { font-size: clamp(2rem, 5vw, 2.6rem); font-weight: 640; letter-spacing: -0.022em; margin: 28px 0 6px; }
+      .lede { color: var(--muted); font-size: 19px; margin: 0 0 40px; }
+      p { margin: 0 0 16px; }
+      .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 26px 28px; margin: 24px 0; }
+      .email { font-size: 22px; font-weight: 560; letter-spacing: -0.01em; }
+      .label { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.12em; margin: 0 0 8px; }
+      .foot { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <a class="back" href="/">&larr; Sanctum</a>
+      <h1>Contact</h1>
+      <p class="lede">Sanctum is a small, free, open-source project. Questions, bug reports, and feedback are genuinely welcome.</p>
+
+      <div class="card">
+        <p class="label">Email</p>
+        <a class="email" href="mailto:you@yourdomain.com">you@yourdomain.com</a>
+      </div>
+
+      <p class="muted">It's maintained by one person in spare time, so replies may take a little while. If you found a bug, including your Windows version and what you were doing helps a lot.</p>
+
+      <p class="foot">Sanctum for Windows. Free, open source, GPLv3. <a href="/privacy">Privacy</a>.</p>
+    </div>
+  </body>
+</html>
