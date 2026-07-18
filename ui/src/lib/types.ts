@@ -48,7 +48,16 @@ export type Command =
   | { cmd: "verify_password"; password: string }
   | { cmd: "disable_protection"; password: string }
   | { cmd: "enable_protection" }
-  | { cmd: "delete_history" };
+  | { cmd: "delete_history" }
+  | { cmd: "poll_intervention" }
+  | { cmd: "trigger_intervention" }
+  | { cmd: "resolve_intervention" };
+
+export interface InterventionDto {
+  pending: boolean;
+  domain: string | null;
+  urges_while_away: number;
+}
 
 export type Response =
   | { resp: "status"; body: Status }
@@ -57,4 +66,5 @@ export type Response =
   | { resp: "deleted"; body: { count: number } }
   | { resp: "ok" }
   | { resp: "denied"; body: { reason: string } }
-  | { resp: "error"; body: { message: string } };
+  | { resp: "error"; body: { message: string } }
+  | { resp: "intervention"; body: InterventionDto };

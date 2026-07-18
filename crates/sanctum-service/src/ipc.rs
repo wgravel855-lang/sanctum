@@ -250,6 +250,11 @@ impl IpcHandler {
                 Response::Ok
             }
 
+            Command::ResolveIntervention => {
+                db.record_event("urge_resisted", "", now)?;
+                Response::Ok
+            }
+
             Command::DeleteHistory => {
                 let count = db.delete_all_history()?;
                 Response::Deleted { count }

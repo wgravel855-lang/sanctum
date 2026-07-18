@@ -5,7 +5,18 @@
 //! JSON command/response frames the service already speaks. This crate is a
 //! thin, typeless proxy — the protocol types live in the front-end and in
 //! `sanctum-core::ipc` on the service side.
+//!
+//! It also runs the block-moment poller (v0.1.5 §B): a background task asks the
+//! service ~once a second whether an intervention is armed and, if so, raises
+//! the always-on-top intervention window. A tray icon keeps the app (and this
+//! poller) alive after the main window is closed.
 
+use std::time::Duration;
+
+use serde_json::json;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
+use tauri::{Emitter, Manager, WindowEvent};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::windows::named_pipe::ClientOptions;
 
@@ -49,9 +60,96 @@ async fn get_status() -> Result<serde_json::Value, String> {
     Ok(resp.get("body").cloned().unwrap_or(resp))
 }
 
+/// Show + focus a window by label.
+fn show_window(app: &tauri::AppHandle, label: &str) {
+    if let Some(w) = app.get_webview_window(label) {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
+/// Raise the intervention window at Phase 1, carrying the triggering domain
+/// (empty for a manual "I need help now").
+fn open_intervention(app: &tauri::AppHandle, domain: &str) {
+    if let Some(w) = app.get_webview_window("intervention") {
+        let _ = w.set_fullscreen(true);
+        let _ = w.show();
+        let _ = w.set_focus();
+        // The webview is pre-loaded (hidden) at startup, so the listener is
+        // already attached — this resets it to Phase 1 with the new domain.
+        let _ = w.emit("intervention-open", json!({ "domain": domain }));
+    }
+}
+
 pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![get_status, send_command])
+        .setup(|app| {
+            // Tray so the app (and the poller below) survive the main window
+            // closing. Without it, closing the window would stop interventions.
+            let open_i = MenuItem::with_id(app, "open", "Open Sanctum", true, None::<&str>)?;
+            let help_i = MenuItem::with_id(app, "help", "I need help now", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&open_i, &help_i, &quit_i])?;
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("Sanctum")
+                .menu(&menu)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "open" => show_window(app, "main"),
+                    "help" => open_intervention(app, ""),
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .build(app)?;
+
+            // Block-moment poller (v0.1.5 §A/§B). PollIntervention clears the
+            // pending flag on read, so each armed intervention raises the window
+            // exactly once.
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    let Ok(resp) = pipe_roundtrip(&json!({ "cmd": "poll_intervention" })).await
+                    else {
+                        continue;
+                    };
+                    let body = resp.get("body");
+                    let pending = body
+                        .and_then(|b| b.get("pending"))
+                        .and_then(|p| p.as_bool())
+                        .unwrap_or(false);
+                    if pending {
+                        let domain = body
+                            .and_then(|b| b.get("domain"))
+                            .and_then(|d| d.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        open_intervention(&handle, &domain);
+                    }
+                }
+            });
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Closing the main window hides it (keeping the tray + poller alive)
+            // instead of quitting. The intervention window closes normally.
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                match window.label() {
+                    // Main window hides to the tray instead of quitting.
+                    "main" => {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                    // The intervention window has no bypass: Esc / Alt+F4 / the
+                    // X are all refused. It is dismissed only by the in-window
+                    // "I'm okay" button, which hides it after the pause.
+                    "intervention" => api.prevent_close(),
+                    _ => {}
+                }
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running Sanctum");
 }

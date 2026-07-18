@@ -55,6 +55,9 @@ pub enum Command {
     /// Open the intervention window on demand ("I need help now" / panic
     /// hotkey). Always arms an intervention, even with no block event.
     TriggerIntervention,
+    /// The user closed an intervention window (no bypass exists). Logs an
+    /// urge-resisted event for the no-shame progress view.
+    ResolveIntervention,
 }
 
 /// Responses from the service.
