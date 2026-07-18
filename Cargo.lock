@@ -817,7 +817,7 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "sanctum-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "argon2",
  "chrono",
@@ -832,7 +832,7 @@ dependencies = [
 
 [[package]]
 name = "sanctum-recover"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "sanctum-core",
@@ -842,7 +842,7 @@ dependencies = [
 
 [[package]]
 name = "sanctum-service"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -861,7 +861,7 @@ dependencies = [
 
 [[package]]
 name = "sanctum-watchdog"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "tracing",

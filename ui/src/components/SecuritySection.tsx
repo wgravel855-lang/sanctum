@@ -93,7 +93,7 @@ export default function SecuritySection({
       </Button>
       {note && <p className="t-caption mt-2 text-center">{note}</p>}
       <GroupFootnote>
-        Gates changes that weaken protection — removing sites, turning it off. It can't unlock a
+        Gates changes that weaken protection: removing sites, or turning it off. It can't unlock a
         locked session; only the timer or Safe Mode can.
       </GroupFootnote>
     </div>

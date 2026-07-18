@@ -36,7 +36,7 @@ export default function Home({
       </p>
       <p className="t-caption mt-1">
         {degraded
-          ? "HOSTS-only — the resolver is recovering"
+          ? "HOSTS-only while the resolver recovers"
           : status?.all_browsers
             ? "All browsers protected"
             : "Some browsers unprotected"}

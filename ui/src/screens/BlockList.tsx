@@ -35,7 +35,7 @@ export default function BlockList({
         <Row>
           <span className="t-row-title">Blocked sites</span>
           <span className="row-trailing t-row-title tnum text-text-1">
-            {status ? commas(status.blocklist_count) : "—"}
+            {status ? commas(status.blocklist_count) : "…"}
           </span>
         </Row>
       </Group>
@@ -58,7 +58,7 @@ export default function BlockList({
       </div>
 
       <GroupFootnote>
-        You can always add sites. During a locked session the list can only grow —
+        You can always add sites. During a locked session the list can only grow, so
         removing a site is disabled until the lock ends. That friction is the point.
       </GroupFootnote>
     </div>

@@ -24,8 +24,8 @@ export default function Switch({
       }`}
     >
       <span
-        className={`absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow-sm transition-transform duration-200 ${
-          checked ? "translate-x-[21px]" : "translate-x-[3px]"
+        className={`absolute left-[3px] top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow-sm transition-transform duration-200 ${
+          checked ? "translate-x-[18px]" : "translate-x-0"
         }`}
       />
     </button>

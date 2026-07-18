@@ -74,7 +74,7 @@ export default function Protection({
     setBusy(false);
   };
 
-  const protectionSubtitle = locked ? "Locked on" : degraded ? "Degraded — HOSTS-only" : active ? "Active" : "Off";
+  const protectionSubtitle = locked ? "Locked on" : degraded ? "Degraded, HOSTS-only" : active ? "Active" : "Off";
 
   return (
     <div className="screen">
@@ -173,7 +173,7 @@ export default function Protection({
         {locked && (
           <GroupFootnote>
             Locked until {dateTimeHuman(status?.locked_until ?? null)}. This can't be turned off
-            early from inside the app — removing it before then requires booting Windows into Safe
+            early from inside the app. Removing it before then requires booting Windows into Safe
             Mode. That friction is the point. It's meant to outlast a craving, not to be impossible.
           </GroupFootnote>
         )}
