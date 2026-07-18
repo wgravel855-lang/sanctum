@@ -166,23 +166,28 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
         }
     }
 
-    // 3. HOSTS floor always. Repoint adapters ONLY once the resolver actually
-    //    ANSWERS on 127.0.0.1:53 — a bound-but-not-serving socket is exactly
-    //    what bricked DNS, so binding alone is never trusted. If it isn't
-    //    serving, restore automatic DNS so the machine keeps resolving.
+    // 3. Apply the HOSTS floor for the bind window, then hand blocking to the
+    //    resolver. The floor is a DEGRADED-mode fallback: while the resolver is
+    //    genuinely serving it handles all blocking AND emits the block events
+    //    that drive the counter and interventions — so we LIFT the floor,
+    //    because HOSTS would otherwise sinkhole domains before they ever reach
+    //    the resolver. Repoint adapters only once the resolver actually answers
+    //    (a bound-but-dead socket is exactly what bricked DNS).
     if let Err(e) = engine.apply_floor(&block) {
         tracing::warn!(error = %e, "could not write HOSTS floor");
     }
 
     let mut serving = bound && engine.self_verify().await;
     if serving {
+        engine.remove_hosts_floor().ok();
+        let _ = crate::netcfg::flush_dns_cache();
         engine.reassert_loopback().ok();
-        tracing::info!("enforcement ACTIVE — resolver verified answering, adapters repointed, HOSTS floor applied");
+        tracing::info!("enforcement ACTIVE — resolver serving; HOSTS floor lifted (resolver-primary)");
     } else {
-        // Undo any prior repoint (e.g. left over from a crashed run) so DNS
-        // is never pointed at a dead resolver.
+        // Undo any prior repoint so DNS is never pointed at a dead resolver; the
+        // HOSTS floor stays to keep blocking while degraded.
         engine.restore_adapters().ok();
-        tracing::warn!("enforcement DEGRADED — resolver not answering on 127.0.0.1:53; HOSTS-only, DNS restored to automatic");
+        tracing::warn!("enforcement DEGRADED — resolver not answering; HOSTS-only, DNS restored to automatic");
     }
 
     // Egress hardening tracks the LIVE serving state. It must be dropped if the
@@ -219,27 +224,37 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
             if let Ok(fresh) = engine.reload(&resolver) {
                 block = fresh;
             }
-            engine.apply_floor(&block).ok();
 
             let now_serving = engine.self_verify().await;
             if now_serving {
+                // Serving: the resolver blocks everything and emits urge events.
+                // On the recovery transition, lift the HOSTS floor (so it can't
+                // short-circuit the resolver), flush stale sinkhole cache, and
+                // re-arm egress.
                 if !serving {
-                    tracing::info!("resolver answering again — repointing adapters, re-arming egress");
+                    tracing::info!("resolver serving — lifting HOSTS floor (resolver-primary), re-arming egress");
+                    engine.remove_hosts_floor().ok();
+                    let _ = crate::netcfg::flush_dns_cache();
                     drop(std::mem::replace(
                         &mut firewall,
                         crate::firewall::apply(doh_ips, plaintext),
                     ));
                 }
                 engine.reassert_loopback().ok();
-            } else if serving {
-                tracing::warn!("resolver stopped answering — restoring automatic DNS, dropping egress block");
-                engine.restore_adapters().ok();
-                // Drop the WFP lockdown so the OS resolver can reach the restored
-                // upstreams instead of being black-holed by our own egress block.
-                drop(std::mem::replace(
-                    &mut firewall,
-                    crate::firewall::apply(false, false),
-                ));
+            } else {
+                // Degraded: resolver not answering — fall back to the HOSTS floor
+                // (refreshed from the current blocklist).
+                engine.apply_floor(&block).ok();
+                if serving {
+                    tracing::warn!("resolver stopped answering — HOSTS floor re-applied, DNS restored");
+                    engine.restore_adapters().ok();
+                    // Drop the WFP lockdown so the OS resolver can reach the
+                    // restored upstreams instead of being black-holed.
+                    drop(std::mem::replace(
+                        &mut firewall,
+                        crate::firewall::apply(false, false),
+                    ));
+                }
             }
             serving = now_serving;
 

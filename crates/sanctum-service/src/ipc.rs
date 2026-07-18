@@ -60,13 +60,11 @@ impl IpcHandler {
     /// sinkhole right away — not on the next reconcile tick, and not from a
     /// stale OS cache.
     fn apply_enforcement(&self, db: &Db) -> anyhow::Result<()> {
-        // Reloading the resolver is the authoritative change and must succeed.
-        let block = engine::reload_resolver(db, &self.resolver)?;
-        // The HOSTS-floor refresh and cache flush are best-effort: a transient
-        // write failure must not fail the command, and the reconcile loop
-        // reasserts the floor regardless.
-        let engine = crate::engine::EnforcementEngine::new();
-        let _ = engine.apply_floor(&block);
+        // The resolver is authoritative while it's serving; the HOSTS floor is
+        // owned by the reconcile loop (degraded-only). So a list/toggle change
+        // just reloads the resolver and flushes cached sinkholes to take effect
+        // immediately.
+        engine::reload_resolver(db, &self.resolver)?;
         let _ = crate::netcfg::flush_dns_cache();
         Ok(())
     }
