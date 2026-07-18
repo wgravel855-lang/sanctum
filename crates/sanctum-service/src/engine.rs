@@ -132,8 +132,22 @@ impl EnforcementEngine {
         if let Some(json) = self.db()?.get_kv("dns_restore")? {
             let journal: Vec<netcfg::AdapterRestore> = serde_json::from_str(&json)?;
             for r in &journal {
-                if let Err(e) = netcfg::restore(r) {
-                    tracing::warn!(adapter = %r.name, error = %e, "failed to restore DNS");
+                // Restoring DNS is the anti-brick path, so retry a transient
+                // netsh failure a few times rather than leaving an adapter
+                // stranded on the (now-dead) 127.0.0.1 resolver.
+                let mut attempt = 0;
+                loop {
+                    match netcfg::restore(r) {
+                        Ok(()) => break,
+                        Err(e) => {
+                            attempt += 1;
+                            if attempt >= 3 {
+                                tracing::warn!(adapter = %r.name, error = %e, "failed to restore DNS after retries");
+                                break;
+                            }
+                            std::thread::sleep(std::time::Duration::from_millis(300));
+                        }
+                    }
                 }
             }
             netcfg::flush_dns_cache()?;

@@ -163,13 +163,15 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
         tracing::warn!("enforcement DEGRADED — resolver not answering on 127.0.0.1:53; HOSTS-only, DNS restored to automatic");
     }
 
-    // Egress hardening applies only while genuinely serving. The guard holds
-    // the WFP dynamic session (if enabled) for the process lifetime.
+    // Egress hardening tracks the LIVE serving state. It must be dropped if the
+    // resolver later dies (otherwise its WFP block would keep the OS resolver
+    // from reaching the restored upstreams — a DNS black-hole) and re-armed when
+    // the resolver recovers. Hence a mutable guard, reconciled below.
     let (doh_ips, plaintext) = Db::open(paths::db_path())
         .and_then(|db| db.load_config())
         .map(|c| (c.block_doh_ips, c.block_plaintext_dns))
         .unwrap_or((true, false));
-    let _firewall = if serving {
+    let mut firewall = if serving {
         crate::firewall::apply(doh_ips, plaintext)
     } else {
         crate::firewall::apply(false, false)
@@ -193,12 +195,22 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
             let now_serving = engine.self_verify().await;
             if now_serving {
                 if !serving {
-                    tracing::info!("resolver answering again — repointing adapters");
+                    tracing::info!("resolver answering again — repointing adapters, re-arming egress");
+                    drop(std::mem::replace(
+                        &mut firewall,
+                        crate::firewall::apply(doh_ips, plaintext),
+                    ));
                 }
                 engine.reassert_loopback().ok();
             } else if serving {
-                tracing::warn!("resolver stopped answering — restoring automatic DNS");
+                tracing::warn!("resolver stopped answering — restoring automatic DNS, dropping egress block");
                 engine.restore_adapters().ok();
+                // Drop the WFP lockdown so the OS resolver can reach the restored
+                // upstreams instead of being black-holed by our own egress block.
+                drop(std::mem::replace(
+                    &mut firewall,
+                    crate::firewall::apply(false, false),
+                ));
             }
             serving = now_serving;
 
@@ -371,6 +383,81 @@ fn register_service(
     Ok(())
 }
 
+/// Wait (up to ~10 s) for a service to reach the Stopped state, so its binary
+/// unlocks and the freshly-installed copy can run.
+fn wait_for_stopped(service: &windows_service::service::Service) {
+    use windows_service::service::ServiceState;
+    for _ in 0..50 {
+        match service.query_status() {
+            Ok(s) if s.current_state == ServiceState::Stopped => return,
+            Ok(_) => std::thread::sleep(Duration::from_millis(200)),
+            Err(_) => return,
+        }
+    }
+}
+
+/// Register a service, or — if a previous install already registered it (same
+/// install dir, same exe path) — stop it and start the freshly-installed
+/// binary instead of failing on create-already-exists. Retries to ride out the
+/// brief "marked for deletion" window a just-run previous uninstaller leaves.
+fn ensure_service(
+    manager: &ServiceManager,
+    name: &str,
+    display: &str,
+    exe: std::path::PathBuf,
+    description: &str,
+) -> anyhow::Result<()> {
+    use windows_service::service::{ServiceAccess, ServiceState};
+
+    let access = ServiceAccess::QUERY_STATUS
+        | ServiceAccess::STOP
+        | ServiceAccess::START
+        | ServiceAccess::CHANGE_CONFIG;
+
+    let mut last_err = None;
+    for _ in 0..30 {
+        match manager.open_service(name, access) {
+            Ok(existing) => {
+                // Already registered (same install dir → same exe path). Stop
+                // the old process so the freshly-copied binary is what runs,
+                // then start it again.
+                let _ = existing.stop();
+                wait_for_stopped(&existing);
+                let _ = existing.set_description(description);
+                let started = existing.start(&[] as &[&std::ffi::OsStr]).is_ok();
+                // `start` fails both when already running (benign) and when the
+                // service is "marked for deletion" (fatal — the new binary never
+                // runs). Distinguish by whether it is actually up.
+                let running = matches!(
+                    existing.query_status().map(|s| s.current_state),
+                    Ok(ServiceState::Running) | Ok(ServiceState::StartPending)
+                );
+                if started || running {
+                    return Ok(());
+                }
+                // Registered but won't start — typically a just-run previous
+                // uninstaller left it pending deletion. Wait for that to clear;
+                // a later pass re-opens (still deleting) or, once the record is
+                // gone, falls through to the create path below.
+                last_err = Some(anyhow::anyhow!(
+                    "service {name} is registered but did not start (pending deletion?)"
+                ));
+                std::thread::sleep(Duration::from_millis(1000));
+            }
+            // Not present, or the record already cleared: create, then retry if
+            // the name is momentarily still reserved.
+            Err(_) => match register_service(manager, name, display, exe.clone(), description) {
+                Ok(()) => return Ok(()),
+                Err(e) => {
+                    last_err = Some(e);
+                    std::thread::sleep(Duration::from_millis(1000));
+                }
+            },
+        }
+    }
+    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("could not register service {name}")))
+}
+
 pub fn install() -> anyhow::Result<()> {
     use windows_service::service_manager::ServiceManagerAccess;
 
@@ -380,7 +467,7 @@ pub fn install() -> anyhow::Result<()> {
     )?;
 
     let exe = std::env::current_exe()?;
-    register_service(
+    ensure_service(
         &manager,
         SERVICE_NAME,
         SERVICE_DISPLAY,
@@ -390,7 +477,7 @@ pub fn install() -> anyhow::Result<()> {
 
     // Companion watchdog (same install directory).
     match exe.parent().map(|d| d.join("sanctum-watchdog.exe")) {
-        Some(w) if w.exists() => register_service(
+        Some(w) if w.exists() => ensure_service(
             &manager,
             WATCHDOG_NAME,
             "Sanctum Watchdog",
