@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import type { Schedule as ScheduleType, Status } from "../lib/types";
 import { sendCommand } from "../lib/ipc";
 import TopBar from "../components/TopBar";
+import Button from "../components/Button";
+import { Group, GroupFootnote, GroupLabel, Row } from "../components/List";
+import { CheckIcon } from "../components/icons";
 
 type Mode = "always_on" | "windows" | "focus" | "off";
 
@@ -73,113 +76,88 @@ export default function Schedule({
     setSaving(true);
     setNote(null);
     const r = await sendCommand({ cmd: "set_schedule", schedule: build(), password });
-    if (r.resp === "ok") {
-      setNote("Schedule saved.");
-      await refresh();
-    } else if (r.resp === "denied") {
-      setNote(r.body.reason);
-    } else {
-      setNote("Couldn't save the schedule.");
-    }
+    setNote(r.resp === "ok" ? "Schedule saved." : r.resp === "denied" ? r.body.reason : "Couldn't save the schedule.");
+    if (r.resp === "ok") await refresh();
     setPassword("");
     setSaving(false);
   };
 
   return (
-    <div className="animate-rise">
+    <div className="screen">
       <TopBar title="Schedule" onBack={onBack} />
 
-      {locked && (
-        <p className="mb-5 rounded-xl border border-accent/30 bg-accent-soft px-4 py-3 text-sm text-accent">
-          The schedule is frozen while a locked session is active.
-        </p>
-      )}
-
-      <div className="space-y-3">
+      <Group>
         {MODES.map((m) => {
           const selected = m.key === mode;
           return (
-            <button
-              key={m.key}
-              disabled={locked}
-              onClick={() => setMode(m.key)}
-              className={`w-full rounded-2xl border p-4 text-left transition-colors disabled:opacity-60 ${
-                selected ? "border-accent bg-accent-soft" : "border-border bg-surface hover:border-accent/40"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-text">{m.label}</span>
-                {selected && <span className="text-xs font-medium text-accent">Selected</span>}
-              </div>
-              <p className="mt-1 text-xs text-muted">{m.desc}</p>
-            </button>
+            <Row key={m.key} onClick={locked ? undefined : () => setMode(m.key)} disabled={locked}>
+              <span className="flex flex-col">
+                <span className="t-row-title">{m.label}</span>
+                <span className="t-caption">{m.desc}</span>
+              </span>
+              {selected && (
+                <span className="row-trailing text-accent">
+                  <CheckIcon className="h-5 w-5" />
+                </span>
+              )}
+            </Row>
           );
         })}
-      </div>
+      </Group>
 
       {mode === "windows" && !locked && (
-        <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
-          <div className="flex items-center gap-3">
-            <label className="flex-1 text-sm text-muted">
+        <div className="mt-8">
+          <GroupLabel>Window</GroupLabel>
+          <div className="flex gap-3">
+            <label className="flex-1 t-caption">
               From
-              <input
-                type="time"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-text outline-none focus:border-accent"
-              />
+              <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="field mt-1" />
             </label>
-            <label className="flex-1 text-sm text-muted">
+            <label className="flex-1 t-caption">
               Until
-              <input
-                type="time"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-text outline-none focus:border-accent"
-              />
+              <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="field mt-1" />
             </label>
           </div>
-          <p className="mt-3 text-xs text-muted">
-            Overnight windows (like 9:00 PM–6:00 AM) are supported.
-          </p>
+          <GroupFootnote>Overnight windows (like 9:00 PM–6:00 AM) are supported.</GroupFootnote>
         </div>
       )}
 
       {mode === "focus" && !locked && (
-        <div className="mt-4 grid grid-cols-4 gap-2">
-          {FOCUS_OPTIONS.map((o) => (
-            <button
-              key={o.mins}
-              onClick={() => setFocusMins(o.mins)}
-              className={`rounded-xl border py-2.5 text-sm transition-colors ${
-                focusMins === o.mins ? "border-accent bg-accent-soft text-accent" : "border-border bg-surface"
-              }`}
-            >
-              {o.label}
-            </button>
-          ))}
+        <div className="mt-8">
+          <GroupLabel>Duration</GroupLabel>
+          <div className="grid grid-cols-4 gap-2">
+            {FOCUS_OPTIONS.map((o) => (
+              <button
+                key={o.mins}
+                onClick={() => setFocusMins(o.mins)}
+                className={`pressable rounded-[10px] border py-2.5 text-[15px] ${
+                  focusMins === o.mins ? "border-accent text-accent" : "border-hairline text-text-1"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
-      {!locked && (
-        <div className="mt-6">
+      {locked ? (
+        <GroupFootnote>The schedule is frozen while a locked session is active.</GroupFootnote>
+      ) : (
+        <div className="mt-8">
           {hasPassword && (
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Settings password"
-              className="mb-3 w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm outline-none focus:border-accent"
+              className="field mb-3"
             />
           )}
-          <button
-            onClick={save}
-            disabled={saving}
-            className="w-full rounded-xl bg-accent py-3 text-sm font-medium text-accent-contrast transition-colors hover:bg-accent-hover disabled:opacity-60"
-          >
+          <Button onClick={save} disabled={saving}>
             {saving ? "Saving…" : "Save schedule"}
-          </button>
-          {note && <p className="mt-2 text-center text-xs text-muted">{note}</p>}
+          </Button>
+          {note && <p className="t-caption mt-2 text-center">{note}</p>}
         </div>
       )}
     </div>

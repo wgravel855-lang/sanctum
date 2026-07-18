@@ -32,8 +32,8 @@ export default function App() {
   const back = () => setScreen("home");
 
   return (
-    <div className="flex min-h-full w-full justify-center bg-bg text-text">
-      <main className="w-full max-w-md px-6 py-10">
+    <div className="flex min-h-full w-full justify-center bg-bg text-text-1">
+      <main className="w-full max-w-md px-5 py-8">
         {screen === "home" && (
           <Home status={status} onNavigate={setScreen} onUrge={() => setUrge(true)} />
         )}

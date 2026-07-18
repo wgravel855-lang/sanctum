@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+/** A home-screen control card. Identical geometry across all four:
+ *  20px accent icon top-left, 12px gap, 17/500 title, 15 --text-2 subtitle. */
 export default function ControlButton({
   icon,
   label,
@@ -14,12 +16,12 @@ export default function ControlButton({
   return (
     <button
       onClick={onClick}
-      className="group flex flex-col items-start gap-3 rounded-2xl border border-border bg-surface p-5 text-left transition-all duration-150 hover:border-accent/40 active:scale-[0.98]"
+      className="pressable flex flex-col items-start gap-3 rounded-[12px] border border-hairline bg-surface-1 p-4 text-left"
     >
-      <span className="text-accent">{icon}</span>
+      <span className="text-accent [&_svg]:h-5 [&_svg]:w-5">{icon}</span>
       <span className="flex flex-col">
-        <span className="text-[15px] font-medium text-text">{label}</span>
-        {sublabel && <span className="text-xs text-muted">{sublabel}</span>}
+        <span className="t-row-title">{label}</span>
+        {sublabel && <span className="t-subtitle">{sublabel}</span>}
       </span>
     </button>
   );

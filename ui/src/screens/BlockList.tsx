@@ -3,6 +3,8 @@ import type { Status } from "../lib/types";
 import { commas } from "../lib/format";
 import { sendCommand } from "../lib/ipc";
 import TopBar from "../components/TopBar";
+import Button from "../components/Button";
+import { Group, GroupFootnote, GroupLabel, Row } from "../components/List";
 
 export default function BlockList({
   status,
@@ -26,18 +28,20 @@ export default function BlockList({
   };
 
   return (
-    <div className="animate-rise">
+    <div className="screen">
       <TopBar title="Block List" onBack={onBack} />
 
-      <div className="rounded-2xl border border-border bg-surface p-5 text-center">
-        <div className="text-3xl font-semibold tabular-nums text-text">
-          {status ? commas(status.blocklist_count) : "—"}
-        </div>
-        <div className="mt-1 text-sm text-muted">sites blocked</div>
-      </div>
+      <Group>
+        <Row>
+          <span className="t-row-title">Blocked sites</span>
+          <span className="row-trailing t-row-title tnum text-text-1">
+            {status ? commas(status.blocklist_count) : "—"}
+          </span>
+        </Row>
+      </Group>
 
-      <h2 className="mt-8 mb-2 text-sm font-medium text-muted">Add a site</h2>
-      <div className="flex gap-2">
+      <div className="mt-8">
+        <GroupLabel>Add a site</GroupLabel>
         <input
           value={domain}
           onChange={(e) => setDomain(e.target.value)}
@@ -45,22 +49,18 @@ export default function BlockList({
           placeholder="example.com"
           spellCheck={false}
           autoCapitalize="none"
-          className="flex-1 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm outline-none focus:border-accent"
+          className="field"
         />
-        <button
-          onClick={add}
-          className="rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-accent-contrast transition-colors hover:bg-accent-hover"
-        >
-          Add
-        </button>
+        <Button className="mt-3" onClick={add}>
+          Add site
+        </Button>
+        {note && <p className="t-caption mt-2 text-center">{note}</p>}
       </div>
-      {note && <p className="mt-2 text-xs text-muted">{note}</p>}
 
-      <p className="mt-6 text-xs leading-relaxed text-muted">
-        You can always add sites. During a locked session the list can only
-        grow — removing a site is disabled until the lock ends. That friction is
-        the point.
-      </p>
+      <GroupFootnote>
+        You can always add sites. During a locked session the list can only grow —
+        removing a site is disabled until the lock ends. That friction is the point.
+      </GroupFootnote>
     </div>
   );
 }

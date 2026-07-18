@@ -28,11 +28,17 @@ const mockStatus: Status = {
   all_browsers: true,
 };
 
-let mockEvents: EventDto[] = [
-  { ts: new Date(Date.now() - 3_600_000).toISOString(), kind: "block", detail: "blocked a request [dns]" },
-  { ts: new Date(Date.now() - 7_200_000).toISOString(), kind: "block", detail: "blocked a request [hosts]" },
-  { ts: new Date(Date.now() - 86_400_000).toISOString(), kind: "lock_start", detail: "480 min" },
-];
+let mockEvents: EventDto[] = (() => {
+  const evs: EventDto[] = [];
+  const now = Date.now();
+  const push = (agoMs: number, kind: string) =>
+    evs.push({ ts: new Date(now - agoMs).toISOString(), kind, detail: "" });
+  [214, 168, 96, 141].forEach((count, day) => {
+    for (let i = 0; i < count; i++) push(day * 86_400_000 + i * 30_000, "block");
+  });
+  push(2 * 86_400_000 + 100, "lock_start");
+  return evs;
+})();
 let mockPassword: string | null = null;
 
 function gate(password: string): boolean {
@@ -45,9 +51,11 @@ async function mockCommand(cmd: Command): Promise<Response> {
       return { resp: "status", body: mockStatus };
     case "recent_events":
       return { resp: "events", body: mockEvents.slice(0, cmd.limit) };
-    case "delete_history":
+    case "delete_history": {
+      const count = mockEvents.length;
       mockEvents = [];
-      return { resp: "deleted", body: { count: 3 } };
+      return { resp: "deleted", body: { count } };
+    }
     case "add_block":
       mockStatus.blocklist_count += 1;
       return { resp: "ok" };

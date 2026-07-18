@@ -1,6 +1,7 @@
 import type { Screen } from "../App";
 import type { Status } from "../lib/types";
 import { commas, untilHuman } from "../lib/format";
+import { useCountUp } from "../lib/hooks";
 import StatusRing from "../components/StatusRing";
 import ControlButton from "../components/ControlButton";
 import { ChartIcon, ClockIcon, HeartIcon, ListIcon, ShieldIcon } from "../components/icons";
@@ -22,16 +23,18 @@ export default function Home({
       ? "Protection is active"
       : "Protection is off";
 
+  const blocked = useCountUp(status?.total_blocked ?? 0);
+
   return (
-    <div className="flex flex-col items-center text-center animate-rise">
+    <div className="screen flex flex-col items-center text-center">
       <StatusRing active={active} degraded={degraded} />
 
-      <h1 className="mt-8 font-display text-[2.1rem] leading-tight text-text">{headline}</h1>
+      <h1 className="t-hero mt-6">{headline}</h1>
 
-      <p className="mt-3 text-lg text-muted">
-        {status ? `${commas(status.total_blocked)} harmful sites blocked` : " "}
+      <p className="t-body mt-3 tnum text-text-2">
+        {status ? `${commas(blocked)} harmful sites blocked` : " "}
       </p>
-      <p className="mt-1 text-sm text-muted">
+      <p className="t-caption mt-1">
         {degraded
           ? "HOSTS-only — the resolver is recovering"
           : status?.all_browsers
@@ -40,16 +43,17 @@ export default function Home({
       </p>
 
       {status?.locked && (
-        <div className="mt-5 rounded-full bg-accent-soft px-4 py-1.5 text-sm font-medium text-accent">
+        <div className="mt-5 rounded-[100px] bg-accent-soft px-4 py-1.5 text-[13px] font-medium text-accent">
           Locked · {untilHuman(status.locked_until)} left
         </div>
       )}
 
+      {/* 40px between the hero block and the grid */}
       <div className="mt-10 grid w-full grid-cols-2 gap-3">
         <ControlButton
           icon={<ShieldIcon />}
           label="Protection"
-          sublabel={active ? "On" : "Off"}
+          sublabel={active ? "On" : degraded ? "Degraded" : "Off"}
           onClick={() => onNavigate("protection")}
         />
         <ControlButton
@@ -74,9 +78,9 @@ export default function Home({
 
       <button
         onClick={onUrge}
-        className="mt-8 flex items-center gap-2 rounded-full px-4 py-2 text-sm text-muted transition-colors hover:text-accent"
+        className="pressable mt-8 flex items-center gap-2 rounded-[100px] bg-surface-2 px-5 py-2.5 text-[15px] font-medium text-text-1"
       >
-        <HeartIcon className="h-4 w-4" />
+        <HeartIcon className="h-4 w-4 text-accent" />
         I need help now
       </button>
     </div>

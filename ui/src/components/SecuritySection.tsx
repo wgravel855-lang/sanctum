@@ -1,9 +1,11 @@
 import { useState } from "react";
 import type { Status } from "../lib/types";
 import { sendCommand } from "../lib/ipc";
+import Button from "./Button";
+import { GroupFootnote, GroupLabel } from "./List";
 
-/** Set or change the settings password. The password gates weakening actions;
- *  it never unlocks a locked session (only the timer or Safe Mode can). */
+/** Set or change the settings password. The button stays a visibly-inert
+ *  Secondary until both fields validate, then becomes Primary. */
 export default function SecuritySection({
   status,
   refresh,
@@ -22,23 +24,18 @@ export default function SecuritySection({
 
   if (locked) {
     return (
-      <p className="mt-8 border-t border-border pt-6 text-xs text-muted">
+      <p className="mt-8 border-t border-hairline pt-6 t-caption">
         The settings password is frozen while a locked session is active.
       </p>
     );
   }
 
+  const valid = next.length >= 4 && next === confirm && (!hasPassword || current.length > 0);
+
   const submit = async () => {
-    setNote(null);
-    if (next.length < 4) {
-      setNote("Choose a password of at least 4 characters.");
-      return;
-    }
-    if (next !== confirm) {
-      setNote("Passwords don't match.");
-      return;
-    }
+    if (!valid) return;
     setBusy(true);
+    setNote(null);
     const r = await sendCommand({
       cmd: "set_password",
       new: next,
@@ -58,18 +55,9 @@ export default function SecuritySection({
     setBusy(false);
   };
 
-  const input =
-    "w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm outline-none focus:border-accent";
-
   return (
-    <div className="mt-8 border-t border-border pt-6">
-      <h2 className="mb-2 text-sm font-medium text-muted">
-        {hasPassword ? "Change settings password" : "Set a settings password"}
-      </h2>
-      <p className="mb-3 text-xs leading-relaxed text-muted">
-        Gates changes that weaken protection — removing sites, turning it off. It
-        can't unlock a locked session; only the timer or Safe Mode can.
-      </p>
+    <div className="mt-8 border-t border-hairline pt-6">
+      <GroupLabel>{hasPassword ? "Change settings password" : "Set a settings password"}</GroupLabel>
       <div className="space-y-2">
         {hasPassword && (
           <input
@@ -77,7 +65,7 @@ export default function SecuritySection({
             value={current}
             onChange={(e) => setCurrent(e.target.value)}
             placeholder="Current password"
-            className={input}
+            className="field"
           />
         )}
         <input
@@ -85,24 +73,29 @@ export default function SecuritySection({
           value={next}
           onChange={(e) => setNext(e.target.value)}
           placeholder={hasPassword ? "New password" : "Password"}
-          className={input}
+          className="field"
         />
         <input
           type="password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
           placeholder="Confirm password"
-          className={input}
+          className="field"
         />
       </div>
-      <button
+      <Button
+        variant={valid ? "primary" : "secondary"}
+        disabled={!valid || busy}
         onClick={submit}
-        disabled={busy}
-        className="mt-3 w-full rounded-xl border border-border bg-surface py-2.5 text-sm transition-colors hover:border-accent/40 disabled:opacity-60"
+        className="mt-3"
       >
         {busy ? "Saving…" : hasPassword ? "Change password" : "Set password"}
-      </button>
-      {note && <p className="mt-2 text-center text-xs text-muted">{note}</p>}
+      </Button>
+      {note && <p className="t-caption mt-2 text-center">{note}</p>}
+      <GroupFootnote>
+        Gates changes that weaken protection — removing sites, turning it off. It can't unlock a
+        locked session; only the timer or Safe Mode can.
+      </GroupFootnote>
     </div>
   );
 }
