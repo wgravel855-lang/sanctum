@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "echo 'Sanctum landing page — static, no build step.'",
+  "buildCommand": "echo 'Sanctum landing page, static, no build step.'",
   "outputDirectory": "site",
   "cleanUrls": true,
   "trailingSlash": false,
