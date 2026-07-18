@@ -1,0 +1,81 @@
+name: release
+
+# Builds the Windows installer in CI and signs it with SignPath, then attaches
+# the SIGNED installer to the GitHub Release. See SIGNING.md for one-time setup.
+#
+# Trigger: push a version tag (e.g. `git tag v0.1.9 && git push origin v0.1.9`),
+# or run manually from the Actions tab.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # create/update the GitHub Release
+  id-token: write # OIDC (optional; SignPath can use it instead of a token)
+
+jobs:
+  build-and-sign:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (MSVC)
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # build-installer.ps1 compiles the three service binaries (release),
+      # stages them as Tauri sidecars, and runs `npm install` + `npm run tauri
+      # build` to produce the NSIS installer. Tauri downloads makensis itself.
+      - name: Build installer
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File tools/build-installer.ps1
+
+      - name: Stage installer under its stable name
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem ui/src-tauri/target/release/bundle/nsis/Sanctum_*_x64-setup.exe | Select-Object -First 1
+          if (-not $exe) { throw "installer not found" }
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item $exe.FullName dist/Sanctum-Windows-Setup.exe
+          Write-Host "staged $($exe.Name) -> Sanctum-Windows-Setup.exe"
+
+      - name: Upload unsigned installer (SignPath signs this artifact)
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-unsigned
+          path: dist/Sanctum-Windows-Setup.exe
+          if-no-files-found: error
+
+      - name: Sign with SignPath
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: sanctum
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - name: Upload signed installer as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-signed
+          path: signed/**
+
+      - name: Attach signed installer to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: signed/Sanctum-Windows-Setup.exe
+          generate_release_notes: true
+          fail_on_unmatched_files: true
