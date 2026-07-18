@@ -312,7 +312,12 @@ impl Resolver {
                             }
                         });
                     }
-                    Err(_) => break,
+                    // A recv error must NEVER kill the listener. On Windows,
+                    // WSAECONNRESET (10054) is delivered on the recv *after* a
+                    // reply to a since-closed client port triggers an ICMP Port
+                    // Unreachable — benign and frequent. Breaking here dropped the
+                    // whole resolver, silently stopping all blocking. Keep serving.
+                    Err(_) => continue,
                 }
             }
         });

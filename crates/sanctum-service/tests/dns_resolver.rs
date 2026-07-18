@@ -167,6 +167,44 @@ async fn safesearch_is_cname_chained() {
     );
 }
 
+/// Regression: on Windows a reply sent to a client that already closed its
+/// socket yields an ICMP Port Unreachable, and the listener's next recv returns
+/// WSAECONNRESET. The serve loop must NOT die on that (it used to `break`,
+/// which silently killed all blocking). Fire many fire-and-forget queries whose
+/// clients drop before the reply lands, then prove the resolver still answers.
+#[tokio::test]
+async fn listener_survives_client_resets() {
+    let addr = make_resolver().await;
+
+    for i in 0..64u16 {
+        let sock = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        sock.connect(addr).await.unwrap();
+        let mut msg = Message::new();
+        msg.set_id(i);
+        msg.set_message_type(MessageType::Query);
+        msg.set_op_code(OpCode::Query);
+        msg.set_recursion_desired(true);
+        let mut q = Query::new();
+        q.set_name(Name::from_ascii("example.org.").unwrap());
+        q.set_query_type(RecordType::A);
+        q.set_query_class(DNSClass::IN);
+        msg.add_query(q);
+        let _ = sock.send(&msg.to_vec().unwrap()).await;
+        drop(sock); // close before the reply arrives -> ICMP unreachable on the reply
+    }
+
+    // Let the replies (and any resulting resets) land.
+    tokio::time::sleep(Duration::from_millis(400)).await;
+
+    // The listener must still be alive and enforcing.
+    let resp = query(addr, "bad.com", RecordType::A).await;
+    assert_eq!(
+        a_answers(&resp),
+        vec![Ipv4Addr::UNSPECIFIED],
+        "resolver stopped answering after client resets — the UDP loop died"
+    );
+}
+
 #[tokio::test]
 async fn canaries_behave() {
     let addr = make_resolver().await;
