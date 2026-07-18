@@ -11,6 +11,7 @@ use std::collections::HashSet;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use sanctum_core::{paths, Blocklist, Db};
 
@@ -145,20 +146,28 @@ impl EnforcementEngine {
     }
 
     /// Bind the resolver on both loopback stacks. Returns `true` if the
-    /// critical IPv4 UDP listener bound (the anti-brick gate for repointing).
+    /// critical IPv4 UDP listener bound. The v4 bind is retried briefly — a
+    /// service restart can race the previous process releasing the port.
     pub async fn bind(&self, resolver: &Arc<Resolver>) -> bool {
         let v4: SocketAddr = (Ipv4Addr::LOCALHOST, 53).into();
         let v6: SocketAddr = (Ipv6Addr::LOCALHOST, 53).into();
 
-        let v4_udp = resolver.clone().spawn_udp(v4).await;
-        let bound = match &v4_udp {
-            Ok(_) => true,
-            Err(e) => {
-                tracing::error!(error = %e, "could not bind 127.0.0.1:53 — staying HOSTS-only, not repointing adapters");
-                false
+        let mut bound = false;
+        for attempt in 0..6 {
+            match resolver.clone().spawn_udp(v4).await {
+                Ok(_) => {
+                    bound = true;
+                    break;
+                }
+                Err(e) => {
+                    tracing::warn!(attempt, error = %e, "127.0.0.1:53 bind failed; retrying");
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                }
             }
-        };
-        // Best-effort for the remaining listeners.
+        }
+        if !bound {
+            tracing::error!("could not bind 127.0.0.1:53 after retries — staying HOSTS-only");
+        }
         let _ = resolver.clone().spawn_tcp(v4).await;
         if resolver.clone().spawn_udp(v6).await.is_err() {
             tracing::warn!("IPv6 loopback resolver unavailable ([::1]:53)");
@@ -166,6 +175,45 @@ impl EnforcementEngine {
         let _ = resolver.clone().spawn_tcp(v6).await;
         bound
     }
+
+    /// End-to-end proof that the resolver is actually answering on
+    /// `127.0.0.1:53` — query the health canary and require the fixed answer.
+    /// This is the real gate for repointing adapters: a bound socket that
+    /// isn't serving must never be trusted (that is what bricked DNS).
+    pub async fn self_verify(&self) -> bool {
+        canary_ok((Ipv4Addr::LOCALHOST, 53).into()).await
+    }
+}
+
+/// Query a loopback resolver for the health canary; true iff it returns the
+/// fixed `127.0.0.2` answer within the timeout.
+async fn canary_ok(addr: SocketAddr) -> bool {
+    use tokio::net::UdpSocket;
+    let Ok(sock) = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0)).await else {
+        return false;
+    };
+    if sock.send_to(&build_canary_query(), addr).await.is_err() {
+        return false;
+    }
+    let mut buf = [0u8; 512];
+    match tokio::time::timeout(Duration::from_millis(1500), sock.recv(&mut buf)).await {
+        Ok(Ok(n)) => buf[..n].windows(4).any(|w| w == [127, 0, 0, 2]),
+        _ => false,
+    }
+}
+
+/// A minimal DNS A query for `health.sanctum.invalid`.
+fn build_canary_query() -> Vec<u8> {
+    let mut q = vec![
+        0x57, 0x41, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ];
+    for label in ["health", "sanctum", "invalid"] {
+        q.push(label.len() as u8);
+        q.extend_from_slice(label.as_bytes());
+    }
+    q.push(0);
+    q.extend_from_slice(&[0x00, 0x01, 0x00, 0x01]);
+    q
 }
 
 /// Build the effective filter state from a database handle: embedded starter

@@ -52,6 +52,15 @@ fn run_service() -> anyhow::Result<()> {
     };
     use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
 
+    // Single-instance guard: never let two service processes race for port 53.
+    let _singleton = match acquire_singleton() {
+        Some(h) => h,
+        None => {
+            tracing::warn!("another sanctum-service instance is already running — exiting");
+            return Ok(());
+        }
+    };
+
     let stop = Arc::new(AtomicBool::new(false));
     let stop_for_handler = stop.clone();
 
@@ -135,24 +144,32 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
         }
     }
 
-    // 3. HOSTS floor always; repoint adapters ONLY if the resolver bound.
+    // 3. HOSTS floor always. Repoint adapters ONLY once the resolver actually
+    //    ANSWERS on 127.0.0.1:53 — a bound-but-not-serving socket is exactly
+    //    what bricked DNS, so binding alone is never trusted. If it isn't
+    //    serving, restore automatic DNS so the machine keeps resolving.
     if let Err(e) = engine.apply_floor(&block) {
         tracing::warn!(error = %e, "could not write HOSTS floor");
     }
-    if bound {
+
+    let mut serving = bound && engine.self_verify().await;
+    if serving {
         engine.reassert_loopback().ok();
-        tracing::info!("enforcement ACTIVE — resolver bound, adapters repointed, HOSTS floor applied");
+        tracing::info!("enforcement ACTIVE — resolver verified answering, adapters repointed, HOSTS floor applied");
     } else {
-        tracing::warn!("enforcement DEGRADED — HOSTS floor only (could not bind loopback :53)");
+        // Undo any prior repoint (e.g. left over from a crashed run) so DNS
+        // is never pointed at a dead resolver.
+        engine.restore_adapters().ok();
+        tracing::warn!("enforcement DEGRADED — resolver not answering on 127.0.0.1:53; HOSTS-only, DNS restored to automatic");
     }
 
-    // Egress hardening. The guard holds the WFP dynamic session (if enabled)
-    // for the process lifetime; DoH-IP firewall rules persist independently.
+    // Egress hardening applies only while genuinely serving. The guard holds
+    // the WFP dynamic session (if enabled) for the process lifetime.
     let (doh_ips, plaintext) = Db::open(paths::db_path())
         .and_then(|db| db.load_config())
         .map(|c| (c.block_doh_ips, c.block_plaintext_dns))
         .unwrap_or((true, false));
-    let _firewall = if bound {
+    let _firewall = if serving {
         crate::firewall::apply(doh_ips, plaintext)
     } else {
         crate::firewall::apply(false, false)
@@ -161,7 +178,9 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
     on_lock(is_locked());
     mark_protected_today();
 
-    // 4. Reconcile loop until a stop is requested.
+    // 4. Reconcile loop until a stop is requested. Every pass re-verifies the
+    //    resolver and keeps adapter DNS consistent with whether it's serving,
+    //    so a resolver that dies mid-run can never leave DNS broken.
     let mut ticks = 0u32;
     while !stop.load(Ordering::SeqCst) {
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -170,9 +189,19 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
         if ticks >= RECONCILE_SECS {
             ticks = 0;
             engine.apply_floor(&block).ok();
-            if bound {
+
+            let now_serving = engine.self_verify().await;
+            if now_serving {
+                if !serving {
+                    tracing::info!("resolver answering again — repointing adapters");
+                }
                 engine.reassert_loopback().ok();
+            } else if serving {
+                tracing::warn!("resolver stopped answering — restoring automatic DNS");
+                engine.restore_adapters().ok();
             }
+            serving = now_serving;
+
             ensure_service_running(WATCHDOG_NAME);
             mark_protected_today();
         }
@@ -224,6 +253,34 @@ fn mark_protected_today() {
     if let Ok(db) = Db::open(paths::db_path()) {
         let _ = db.mark_protected_today();
     }
+}
+
+/// Acquire the process-wide single-instance mutex, retrying briefly so a
+/// restart can wait for a dying prior process to release it. Returns the handle
+/// to hold for the process lifetime (the OS frees it on exit), or `None` if
+/// another instance still holds it — preventing two processes racing for :53.
+fn acquire_singleton() -> Option<windows::Win32::Foundation::HANDLE> {
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS};
+    use windows::Win32::System::Threading::CreateMutexW;
+
+    let name: Vec<u16> = "Global\\SanctumServiceSingleton\0".encode_utf16().collect();
+    for _ in 0..10 {
+        unsafe {
+            match CreateMutexW(None, false, PCWSTR(name.as_ptr())) {
+                Ok(h) => {
+                    if GetLastError() == ERROR_ALREADY_EXISTS {
+                        let _ = CloseHandle(h);
+                        std::thread::sleep(std::time::Duration::from_millis(300));
+                        continue;
+                    }
+                    return Some(h);
+                }
+                Err(_) => return None,
+            }
+        }
+    }
+    None
 }
 
 fn is_locked() -> bool {
