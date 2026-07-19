@@ -118,8 +118,6 @@ pub struct AppConfig {
     /// filter can break the service's own forwarding). See README.
     #[serde(default)]
     pub block_plaintext_dns: bool,
-    /// Cooldown before an *unlocked* uninstall is permitted.
-    pub uninstall_cooldown_hours: u32,
 }
 
 fn default_true() -> bool {
@@ -140,7 +138,6 @@ impl Default for AppConfig {
             block_strict: false,
             block_doh_ips: true,
             block_plaintext_dns: false,
-            uninstall_cooldown_hours: 24,
         }
     }
 }
