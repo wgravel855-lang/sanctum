@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Status } from "../lib/types";
-import { commas } from "../lib/format";
 import { listCustomBlocks, sendCommand } from "../lib/ipc";
 import TopBar from "../components/TopBar";
 import Button from "../components/Button";
@@ -69,16 +68,13 @@ export default function BlockList({
     <div className="screen">
       <TopBar title="Block List" onBack={onBack} />
 
-      <Group>
-        <Row>
-          <span className="t-row-title">Blocked sites</span>
-          <span className="row-trailing t-row-title tnum text-text-1">
-            {status ? commas(status.blocklist_count) : "…"}
-          </span>
-        </Row>
-      </Group>
+      <p className="t-body text-text-2">
+        Sanctum already blocks tens of thousands of adult sites out of the box.
+        Add anything else you want kept out here.
+      </p>
 
-      {/* User-added sites (removable). The curated starter list is built in. */}
+      {/* User-added sites (removable). The built-in baseline isn't user-managed
+          and isn't listed or counted here. */}
       <div className="mt-8">
         <GroupLabel>Your added sites</GroupLabel>
         {custom.length === 0 ? (
@@ -157,8 +153,7 @@ export default function BlockList({
 
       <GroupFootnote>
         You can always add sites. During a locked session the list can only grow, so removing a
-        site is disabled until the lock ends. That friction is the point. The built-in starter list
-        stays on.
+        site is disabled until the lock ends. That friction is the point.
       </GroupFootnote>
     </div>
   );

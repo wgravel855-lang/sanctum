@@ -112,7 +112,13 @@ pub struct Status {
     pub locked: bool,
     pub locked_until: Option<DateTime<Utc>>,
     pub schedule: Schedule,
+    /// Size of the effective block set (built-in baseline ∪ the user's list).
+    /// Not shown as "your block list" — the baseline isn't user-managed.
     pub blocklist_count: usize,
+    /// How many sites the user has personally added. This is what the Block
+    /// List screen manages and counts.
+    #[serde(default)]
+    pub custom_block_count: usize,
     pub has_password: bool,
     /// The "All browsers protected" status line.
     pub all_browsers: bool,

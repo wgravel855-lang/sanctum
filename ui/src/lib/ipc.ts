@@ -26,6 +26,7 @@ const mockStatus: Status = {
   locked_until: null,
   schedule: { mode: "always_on" },
   blocklist_count: 47621,
+  custom_block_count: 2,
   has_password: false,
   all_browsers: true,
 };
@@ -67,6 +68,7 @@ async function mockCommand(cmd: Command): Promise<Response> {
       if (!mockCustomBlocks.includes(cmd.domain)) {
         mockCustomBlocks.push(cmd.domain);
         mockStatus.blocklist_count += 1;
+        mockStatus.custom_block_count = mockCustomBlocks.length;
       }
       return { resp: "ok" };
     case "remove_block":
@@ -76,6 +78,7 @@ async function mockCommand(cmd: Command): Promise<Response> {
       if (mockCustomBlocks.includes(cmd.domain)) {
         mockCustomBlocks = mockCustomBlocks.filter((d) => d !== cmd.domain);
         mockStatus.blocklist_count -= 1;
+        mockStatus.custom_block_count = mockCustomBlocks.length;
       }
       return { resp: "ok" };
     case "start_lock":

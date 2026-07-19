@@ -300,6 +300,7 @@ impl IpcHandler {
             locked_until: lock.locked_until,
             schedule: cfg.schedule,
             blocklist_count: self.resolver.blocklist_len(),
+            custom_block_count: db.list_custom_block()?.len(),
             has_password: db.has_password()?,
             all_browsers: true,
         })

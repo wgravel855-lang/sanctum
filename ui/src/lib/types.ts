@@ -25,6 +25,7 @@ export interface Status {
   locked_until: string | null;
   schedule: Schedule;
   blocklist_count: number;
+  custom_block_count: number;
   has_password: boolean;
   all_browsers: boolean;
 }

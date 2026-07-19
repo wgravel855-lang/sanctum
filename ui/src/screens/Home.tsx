@@ -72,7 +72,7 @@ export default function Home({
         <ControlButton
           icon={<ListIcon />}
           label="Block List"
-          sublabel={status ? `${commas(status.blocklist_count)} sites` : undefined}
+          sublabel={blockListLabel(status)}
           onClick={() => onNavigate("blocklist")}
         />
         <ControlButton
@@ -95,6 +95,13 @@ export default function Home({
       </p>
     </div>
   );
+}
+
+function blockListLabel(status: Status | null): string | undefined {
+  if (!status) return undefined;
+  const n = status.custom_block_count;
+  if (n === 0) return "Add your sites";
+  return `${commas(n)} added`;
 }
 
 function scheduleLabel(status: Status | null): string | undefined {
