@@ -6,6 +6,7 @@ import TopBar from "../components/TopBar";
 import Switch from "../components/Switch";
 import Button from "../components/Button";
 import SecuritySection from "../components/SecuritySection";
+import ConfirmModal from "../components/ConfirmModal";
 import { Group, GroupFootnote, Row } from "../components/List";
 
 const DURATIONS = [
@@ -14,6 +15,16 @@ const DURATIONS = [
   { label: "1 day", minutes: 1440 },
   { label: "1 week", minutes: 10080 },
 ];
+
+// Shown before the user commits to each mode, so nothing is a surprise.
+const STRICT_COPY = {
+  title: "Turn on Strict mode?",
+  body: "Strict mode also blocks mainstream social and image-heavy sites like Instagram, Pinterest, Reddit, and TikTok, which often surface suggestive content. Those sites will stop loading in every browser on this computer.\n\nYou can turn Strict mode back off with your settings password, unless a locked session is running.",
+};
+const COLD_COPY = {
+  title: "Start a Cold Turkey session?",
+  body: "For the length of time you pick, every setting is frozen. You can add sites to the block list but cannot remove any, protection cannot be turned off, and your password will not unlock it.\n\nThe only early way out is restarting Windows in Safe Mode, so this is meant to outlast a craving rather than trap you.",
+};
 
 export default function Protection({
   status,
@@ -36,8 +47,12 @@ export default function Protection({
   const [note, setNote] = useState<string | null>(null);
   const [bypassPrompt, setBypassPrompt] = useState(false);
   const [bypassPw, setBypassPw] = useState("");
+  const [strictPrompt, setStrictPrompt] = useState(false);
+  const [strictPw, setStrictPw] = useState("");
+  const [modal, setModal] = useState<null | "strict" | "cold">(null);
 
   const bypassOn = status?.block_bypass ?? true;
+  const strictOn = status?.block_strict ?? false;
 
   const handle = async (r: Response, okMsg?: string) => {
     if (r.resp === "ok") setNote(okMsg ?? null);
@@ -92,6 +107,38 @@ export default function Protection({
     setBusy(false);
   };
 
+  const setStrict = async (enabled: boolean, pw: string) => {
+    setBusy(true);
+    await handle(
+      await sendCommand({ cmd: "set_strict_mode", enabled, password: pw }),
+      enabled ? "Strict mode on." : "Strict mode off.",
+    );
+    setBusy(false);
+  };
+
+  const toggleStrict = (next: boolean) => {
+    setNote(null);
+    if (next) {
+      setModal("strict"); // confirm before enabling
+    } else if (hasPassword) {
+      setStrictPrompt(true);
+    } else {
+      setStrict(false, "");
+    }
+  };
+
+  const confirmStrictOff = async () => {
+    await setStrict(false, strictPw);
+    setStrictPw("");
+    setStrictPrompt(false);
+  };
+
+  const toggleColdTurkey = (next: boolean) => {
+    setNote(null);
+    if (next) setModal("cold"); // confirm before arming
+    else setArmCT(false);
+  };
+
   const startLock = async (minutes: number) => {
     setBusy(true);
     setNote(null);
@@ -135,7 +182,50 @@ export default function Protection({
             />
           </span>
         </Row>
+        <Row>
+          <span className="flex flex-col">
+            <span className="t-row-title">Strict mode</span>
+            <span className="t-caption">Also block social & image sites</span>
+          </span>
+          <span className="row-trailing">
+            <Switch
+              checked={strictOn}
+              disabled={locked || busy}
+              onChange={toggleStrict}
+              label="Strict mode"
+            />
+          </span>
+        </Row>
       </Group>
+
+      {strictPrompt && (
+        <div className="mt-3">
+          <p className="t-caption mb-2 px-4">Enter your password to turn Strict mode off.</p>
+          <input
+            type="password"
+            autoFocus
+            value={strictPw}
+            onChange={(e) => setStrictPw(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && confirmStrictOff()}
+            placeholder="Password"
+            className="field"
+          />
+          <div className="mt-3 flex items-center justify-between">
+            <button
+              onClick={() => {
+                setStrictPrompt(false);
+                setStrictPw("");
+              }}
+              className="pressable text-[15px] text-text-2"
+            >
+              Cancel
+            </button>
+            <Button variant="destructive" onClick={confirmStrictOff}>
+              Turn off
+            </Button>
+          </div>
+        </div>
+      )}
 
       {bypassPrompt && (
         <div className="mt-3">
@@ -211,10 +301,7 @@ export default function Protection({
               <Switch
                 checked={locked || armCT}
                 disabled={locked || busy}
-                onChange={(next) => {
-                  setNote(null);
-                  setArmCT(next);
-                }}
+                onChange={toggleColdTurkey}
                 label="Cold Turkey mode"
               />
             </span>
@@ -254,6 +341,29 @@ export default function Protection({
       {note && <p className="t-caption mt-4 text-center">{note}</p>}
 
       <SecuritySection status={status} refresh={refresh} />
+
+      <ConfirmModal
+        open={modal === "strict"}
+        title={STRICT_COPY.title}
+        body={STRICT_COPY.body}
+        confirmLabel="Turn on Strict mode"
+        onConfirm={() => {
+          setModal(null);
+          setStrict(true, "");
+        }}
+        onCancel={() => setModal(null)}
+      />
+      <ConfirmModal
+        open={modal === "cold"}
+        title={COLD_COPY.title}
+        body={COLD_COPY.body}
+        confirmLabel="I understand, continue"
+        onConfirm={() => {
+          setModal(null);
+          setArmCT(true);
+        }}
+        onCancel={() => setModal(null)}
+      />
     </div>
   );
 }

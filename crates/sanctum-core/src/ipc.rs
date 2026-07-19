@@ -50,6 +50,10 @@ pub enum Command {
     /// allowed (strengthens); disabling is password-gated and frozen while
     /// locked.
     SetBypassBlocking { enabled: bool, password: String },
+    /// Toggle Strict mode (blocks mainstream suggestive-content gateways).
+    /// Enabling is always allowed; disabling is password-gated and frozen while
+    /// locked.
+    SetStrictMode { enabled: bool, password: String },
     /// Wipe the activity log immediately.
     DeleteHistory,
     /// Poll for a pending block-moment intervention (v0.1.5 §A). The UI calls
@@ -126,6 +130,9 @@ pub struct Status {
     /// Whether bypass-tool blocking (proxies/VPN/Tor/DoH) is on.
     #[serde(default)]
     pub block_bypass: bool,
+    /// Whether Strict mode (suggestive-content gateways) is on.
+    #[serde(default)]
+    pub block_strict: bool,
     pub has_password: bool,
     /// The "All browsers protected" status line.
     pub all_browsers: bool,

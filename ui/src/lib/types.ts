@@ -27,6 +27,7 @@ export interface Status {
   blocklist_count: number;
   custom_block_count: number;
   block_bypass: boolean;
+  block_strict: boolean;
   has_password: boolean;
   all_browsers: boolean;
 }
@@ -53,6 +54,7 @@ export type Command =
   | { cmd: "disable_protection"; password: string }
   | { cmd: "enable_protection" }
   | { cmd: "set_bypass_blocking"; enabled: boolean; password: string }
+  | { cmd: "set_strict_mode"; enabled: boolean; password: string }
   | { cmd: "delete_history" }
   | { cmd: "poll_intervention" }
   | { cmd: "trigger_intervention" }

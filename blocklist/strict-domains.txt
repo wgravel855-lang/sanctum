@@ -1,0 +1,85 @@
+# Sanctum Strict-mode blocklist (curated + audited, opt-in).
+#
+# Mainstream, non-pornographic sites where suggestive / NSFW-adjacent content is
+# commonly and easily encountered. OFF by default; enabling it is opt-in and
+# reversible (password-gated, frozen while locked). Matching is by suffix, so an
+# apex domain blocks the domain and all subdomains.
+#
+# Deliberately NOT here: primarily-communication/work tools (Discord), filtered
+# pro-portfolio sites (ArtStation), and overtly pornographic sites (those live
+# in the main adult list). Overtly adult sites are already blocked by default.
+
+# --- social & microblogging ---
+instagram.com
+pinterest.com
+facebook.com
+threads.net
+twitter.com
+x.com
+reddit.com
+tumblr.com
+bsky.app
+vk.com
+weibo.com
+
+# --- image & art platforms / boards ---
+imgur.com
+flickr.com
+deviantart.com
+500px.com
+pixiv.net
+weheartit.com
+9gag.com
+4chan.org
+
+# --- short-video & live streaming ---
+tiktok.com
+snapchat.com
+twitch.tv
+kick.com
+bigo.tv
+likee.video
+kwai.com
+tango.me
+liveme.com
+younow.com
+yy.com
+
+# --- dating & hookup ---
+tinder.com
+bumble.com
+hinge.co
+grindr.com
+scruff.com
+okcupid.com
+match.com
+eharmony.com
+pof.com
+plentyoffish.com
+zoosk.com
+badoo.com
+happn.com
+coffeemeetsbagel.com
+ourtime.com
+meetme.com
+ashleymadison.com
+seeking.com
+feeld.co
+fetlife.com
+benaughty.com
+
+# --- random-stranger chat & anonymous messaging ---
+chatroulette.com
+ome.tv
+chatrandom.com
+camsurf.com
+emeraldchat.com
+shagle.com
+chatspin.com
+chathub.cam
+bazoocam.org
+tinychat.com
+kik.com
+whisper.sh
+yubo.live
+azarlive.com

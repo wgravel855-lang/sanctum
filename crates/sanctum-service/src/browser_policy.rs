@@ -55,6 +55,12 @@ fn targets() -> Vec<Target> {
             key: r"SOFTWARE\Policies\Vivaldi",
             values: CHROMIUM_OFF,
         },
+        // Opera is Chromium-based and reads policies here; DnsOverHttpsMode is
+        // among the Chromium policies it supports.
+        Target {
+            key: r"SOFTWARE\Policies\Opera Software\Opera",
+            values: CHROMIUM_OFF,
+        },
         Target {
             key: r"SOFTWARE\Policies\Mozilla\Firefox\DNSOverHTTPS",
             values: FIREFOX_OFF,

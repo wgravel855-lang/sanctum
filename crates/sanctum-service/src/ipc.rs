@@ -283,6 +283,27 @@ impl IpcHandler {
                 Response::Ok
             }
 
+            Command::SetStrictMode { enabled, password } => {
+                // Same gating as bypass: enabling strengthens (always allowed);
+                // disabling is password-gated and frozen while locked.
+                if !enabled {
+                    if locked {
+                        return Ok(denied(
+                            "Strict mode can't be turned off during a locked session.",
+                        ));
+                    }
+                    if !check_password(&db, &password)? {
+                        return Ok(denied("Incorrect password."));
+                    }
+                }
+                let mut cfg = db.load_config()?;
+                cfg.block_strict = enabled;
+                db.save_config(&cfg)?;
+                self.apply_enforcement(&db)?;
+                db.record_event(if enabled { "strict_on" } else { "strict_off" }, "", now)?;
+                Response::Ok
+            }
+
             Command::ResolveIntervention => {
                 db.record_urge_resisted(now)?;
                 Response::Ok
@@ -327,6 +348,7 @@ impl IpcHandler {
             blocklist_count: self.resolver.blocklist_len(),
             custom_block_count: db.list_custom_block()?.len(),
             block_bypass: cfg.block_bypass,
+            block_strict: cfg.block_strict,
             has_password: db.has_password()?,
             all_browsers: true,
         })

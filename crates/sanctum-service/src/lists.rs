@@ -11,6 +11,10 @@ const ADULT: &str = include_str!("../../../blocklist/adult-domains.txt");
 const ADULT_FULL: &str = include_str!("../../../blocklist/adult-domains-full.txt");
 /// Bypass-tool list: DoH/VPN/proxy/Tor (hagezi, GPL-3.0; see THIRD_PARTY.md).
 const BYPASS: &str = include_str!("../../../blocklist/bypass-domains.txt");
+/// Curated bypass additions the upstream misses (e.g. Opera's VPN proxy).
+const BYPASS_EXTRA: &str = include_str!("../../../blocklist/bypass-extra.txt");
+/// Strict-mode list: mainstream suggestive-content gateways (opt-in).
+const STRICT: &str = include_str!("../../../blocklist/strict-domains.txt");
 const DOH: &str = include_str!("../../../blocklist/doh-endpoints.txt");
 const SAFESEARCH: &str = include_str!("../../../blocklist/safesearch.map");
 
@@ -38,11 +42,23 @@ pub fn doh_list() -> Blocklist {
     Blocklist::parse(DOH).0
 }
 
+/// Strict-mode block set (mainstream suggestive-content gateways), parsed once.
+pub fn strict_blocklist() -> Blocklist {
+    static STRICT_SET: OnceLock<Blocklist> = OnceLock::new();
+    STRICT_SET.get_or_init(|| Blocklist::parse(STRICT).0).clone()
+}
+
 /// Bypass-tool block set (DoH resolvers, VPN/proxy services, Tor). ~17k
 /// entries, parsed once per process behind a `OnceLock`.
 pub fn bypass_blocklist() -> Blocklist {
     static BYPASS_SET: OnceLock<Blocklist> = OnceLock::new();
-    BYPASS_SET.get_or_init(|| Blocklist::parse(BYPASS).0).clone()
+    BYPASS_SET
+        .get_or_init(|| {
+            let mut b = Blocklist::parse(BYPASS).0;
+            b.merge(&Blocklist::parse(BYPASS_EXTRA).0);
+            b
+        })
+        .clone()
 }
 
 pub fn safesearch_map() -> SafeSearchMap {
@@ -85,6 +101,28 @@ mod tests {
             bypass_blocklist().len()
         );
         assert!(!safesearch_map().is_empty());
+    }
+
+    #[test]
+    fn strict_list_covers_named_gateways() {
+        let s = strict_blocklist();
+        assert!(s.len() >= 40, "strict list too small: {}", s.len());
+        for d in ["instagram.com", "pinterest.com", "reddit.com", "tiktok.com", "tinder.com"] {
+            assert!(s.is_blocked(d), "strict should block {d}");
+            assert!(s.is_blocked(&format!("www.{d}")), "strict should block www.{d}");
+        }
+        // Overtly adult / excluded gateways must NOT be in the strict tier.
+        assert!(!s.is_blocked("discord.com"));
+    }
+
+    #[test]
+    fn bypass_covers_opera_vpn_and_common_tools() {
+        let b = bypass_blocklist();
+        // Opera's modern built-in VPN proxy (curated supplement, suffix match).
+        assert!(b.is_blocked("de0.opera-proxy.net"));
+        assert!(b.is_blocked("us1.opera-proxy.net"));
+        // Opera's older SurfEasy backend (from the upstream list).
+        assert!(b.is_blocked("api.surfeasy.com"));
     }
 
     #[test]

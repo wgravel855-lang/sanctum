@@ -29,4 +29,8 @@ It blocks the DNS-over-HTTPS resolvers, VPN/proxy services, and Tor entry
 points commonly used to route around a DNS content filter. Same validation and
 parent-pruning as the adult list.
 
+`blocklist/bypass-extra.txt` is a small hand-maintained supplement (merged on
+top) for bypass vectors the upstream misses — e.g. Opera's built-in VPN proxy
+(`*.opera-proxy.net`).
+
 Thank you to the maintainers of these lists.

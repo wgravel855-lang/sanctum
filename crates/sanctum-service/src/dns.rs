@@ -58,6 +58,7 @@ enum SinkKind {
     Blocked,
     Doh,
     Bypass,
+    Strict,
 }
 
 /// The hot-reloadable filter lists + toggles.
@@ -72,9 +73,13 @@ pub struct FilterState {
     /// Bypass tools (DoH/VPN/proxy/Tor), matched by suffix. Blocked when
     /// `block_bypass` is on, so a locked session also seals the escape hatches.
     pub bypass: Blocklist,
+    /// Strict-mode gateways (mainstream suggestive-content sites). Blocked when
+    /// `block_strict` is on. Opt-in and off by default.
+    pub strict: Blocklist,
     pub enforce_safesearch: bool,
     pub block_doh: bool,
     pub block_bypass: bool,
+    pub block_strict: bool,
 }
 
 impl FilterState {
@@ -85,9 +90,11 @@ impl FilterState {
             safesearch,
             doh,
             bypass: Blocklist::new(),
+            strict: Blocklist::new(),
             enforce_safesearch: true,
             block_doh: true,
             block_bypass: false,
+            block_strict: false,
         }
     }
 
@@ -108,6 +115,8 @@ impl FilterState {
             Decision::Sink(SinkKind::Doh)
         } else if self.block_bypass && self.bypass.is_blocked(host) {
             Decision::Sink(SinkKind::Bypass)
+        } else if self.block_strict && self.strict.is_blocked(host) {
+            Decision::Sink(SinkKind::Strict)
         } else if self.enforce_safesearch {
             match self.safesearch.lookup(host) {
                 Some(target) => Decision::SafeSearch(target.to_string()),
@@ -210,9 +219,11 @@ impl Resolver {
                 self.sink_response(&req, &q)
             }
             Decision::Sink(SinkKind::Doh) => self.sink_response(&req, &q),
-            // Bypass tools sinkhole like DoH endpoints: blocked, but not fed to
-            // the intervention debouncer (a proxy lookup isn't an urge moment).
+            // Bypass tools + strict-mode gateways sinkhole like DoH endpoints:
+            // blocked, but not fed to the intervention debouncer (visiting
+            // Instagram or a proxy is not the same "urge" moment as a porn hit).
             Decision::Sink(SinkKind::Bypass) => self.sink_response(&req, &q),
+            Decision::Sink(SinkKind::Strict) => self.sink_response(&req, &q),
             Decision::SafeSearch(target) => self.safesearch_response(&req, &q, &target).await,
         };
         response.to_vec().ok()
@@ -461,6 +472,21 @@ mod tests {
         r.update(st);
         assert_eq!(r.classify("croxyproxy.com"), Decision::Sink(SinkKind::Bypass));
         assert_eq!(r.classify("www.croxyproxy.com"), Decision::Sink(SinkKind::Bypass));
+    }
+
+    #[test]
+    fn strict_mode_is_gated_by_the_flag() {
+        let r = resolver();
+        let mut st = r.state.read().unwrap().clone();
+        st.strict.add("instagram.com");
+        r.update(st.clone());
+        // Off by default -> forwarded.
+        assert_eq!(r.classify("www.instagram.com"), Decision::Forward);
+        // On -> sinkholed as Strict (does not feed the intervention debouncer).
+        st.block_strict = true;
+        r.update(st);
+        assert_eq!(r.classify("instagram.com"), Decision::Sink(SinkKind::Strict));
+        assert_eq!(r.classify("www.instagram.com"), Decision::Sink(SinkKind::Strict));
     }
 
     #[test]

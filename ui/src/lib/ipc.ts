@@ -28,6 +28,7 @@ const mockStatus: Status = {
   blocklist_count: 47621,
   custom_block_count: 2,
   block_bypass: true,
+  block_strict: false,
   has_password: false,
   all_browsers: true,
 };
@@ -114,6 +115,14 @@ async function mockCommand(cmd: Command): Promise<Response> {
         if (!gate(cmd.password)) return { resp: "denied", body: { reason: "Incorrect password." } };
       }
       mockStatus.block_bypass = cmd.enabled;
+      return { resp: "ok" };
+    case "set_strict_mode":
+      if (!cmd.enabled) {
+        if (mockStatus.locked)
+          return { resp: "denied", body: { reason: "Can't turn off during a locked session." } };
+        if (!gate(cmd.password)) return { resp: "denied", body: { reason: "Incorrect password." } };
+      }
+      mockStatus.block_strict = cmd.enabled;
       return { resp: "ok" };
     case "resolve_intervention":
       mockStatus.urges_resisted += 1;

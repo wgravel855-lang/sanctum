@@ -261,6 +261,8 @@ pub fn filter_state_from_db(db: &Db) -> anyhow::Result<(FilterState, Blocklist)>
     state.block_doh = cfg.block_doh;
     state.bypass = lists::bypass_blocklist();
     state.block_bypass = cfg.block_bypass;
+    state.strict = lists::strict_blocklist();
+    state.block_strict = cfg.block_strict;
     Ok((state, block))
 }
 

@@ -1,0 +1,11 @@
+# Sanctum curated bypass-tool supplement.
+#
+# Hand-maintained additions merged on top of the fetched hagezi bypass list
+# (blocklist/bypass-domains.txt). For bypass vectors the upstream misses.
+# Matching is by suffix, so an entry covers the domain and all subdomains.
+
+# Opera built-in VPN proxy endpoints (de0.opera-proxy.net, us0.opera-proxy.net,
+# ...). Blocking these stops Opera's VPN from establishing a tunnel, so traffic
+# falls back to the system resolver Sanctum filters. This domain is used ONLY by
+# the VPN proxy, not by normal Opera browsing/updates.
+opera-proxy.net

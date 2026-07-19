@@ -104,6 +104,11 @@ pub struct AppConfig {
     /// frozen while locked), so a locked session also seals the escape hatches.
     #[serde(default = "default_true")]
     pub block_bypass: bool,
+    /// Strict mode: also block mainstream suggestive-content gateways (social,
+    /// image boards, etc). Opt-in, OFF by default; reversible (password-gated,
+    /// frozen while locked).
+    #[serde(default)]
+    pub block_strict: bool,
     /// Block known DoH provider IPs on :443 via Windows Firewall (safe; on).
     #[serde(default = "default_true")]
     pub block_doh_ips: bool,
@@ -132,6 +137,7 @@ impl Default for AppConfig {
             enforce_safesearch: true,
             block_doh: true,
             block_bypass: true,
+            block_strict: false,
             block_doh_ips: true,
             block_plaintext_dns: false,
             uninstall_cooldown_hours: 24,
