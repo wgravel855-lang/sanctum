@@ -1,10 +1,8 @@
-# Sanctum bulk adult-domain blocklist (compiled)
+# Sanctum adult blocklist (compiled)
 # Source: https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn-only/hosts
-# Upstream: StevenBlack/hosts porn extension (MIT), aggregating
-#           Sinfonietta/hostfiles. See THIRD_PARTY.md.
-# Compiled: 2026-07-18 | entries: 47621 (from 76742 valid hosts; 5 invalid skipped)
-# Matching is by suffix: an entry blocks the domain and all subdomains,
-# so entries whose parent is also listed have been pruned.
+# Upstream: StevenBlack/hosts porn extension (MIT), aggregating Sinfonietta/hostfiles. See THIRD_PARTY.md.
+# Compiled: 2026-07-19 | entries: 47621 (from 76742 valid; 5 invalid skipped)
+# Matching is by suffix; entries whose parent is also listed are pruned.
 0.oldgyhogola.com
 0.xd-cdn.com
 002.pinknotora.net

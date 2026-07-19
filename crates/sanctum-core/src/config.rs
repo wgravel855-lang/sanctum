@@ -99,6 +99,11 @@ pub struct AppConfig {
     pub sink_ipv6: String,
     pub enforce_safesearch: bool,
     pub block_doh: bool,
+    /// Block bypass tools (DoH resolvers, VPN/proxy services, Tor) at the DNS
+    /// layer. On by default; turning it off is a weakening op (password-gated,
+    /// frozen while locked), so a locked session also seals the escape hatches.
+    #[serde(default = "default_true")]
+    pub block_bypass: bool,
     /// Block known DoH provider IPs on :443 via Windows Firewall (safe; on).
     #[serde(default = "default_true")]
     pub block_doh_ips: bool,
@@ -126,6 +131,7 @@ impl Default for AppConfig {
             sink_ipv6: crate::SINK_IPV6.to_string(),
             enforce_safesearch: true,
             block_doh: true,
+            block_bypass: true,
             block_doh_ips: true,
             block_plaintext_dns: false,
             uninstall_cooldown_hours: 24,

@@ -34,6 +34,10 @@ export default function Protection({
   const [pwPrompt, setPwPrompt] = useState(false);
   const [password, setPassword] = useState("");
   const [note, setNote] = useState<string | null>(null);
+  const [bypassPrompt, setBypassPrompt] = useState(false);
+  const [bypassPw, setBypassPw] = useState("");
+
+  const bypassOn = status?.block_bypass ?? true;
 
   const handle = async (r: Response, okMsg?: string) => {
     if (r.resp === "ok") setNote(okMsg ?? null);
@@ -62,6 +66,29 @@ export default function Protection({
     await handle(await sendCommand({ cmd: "disable_protection", password }), "Protection off.");
     setPassword("");
     setPwPrompt(false);
+    setBusy(false);
+  };
+
+  const toggleBypass = async (next: boolean) => {
+    setNote(null);
+    if (next) {
+      setBusy(true);
+      await handle(await sendCommand({ cmd: "set_bypass_blocking", enabled: true, password: "" }), "Bypass blocking on.");
+      setBusy(false);
+    } else if (hasPassword) {
+      setBypassPrompt(true);
+    } else {
+      setBusy(true);
+      await handle(await sendCommand({ cmd: "set_bypass_blocking", enabled: false, password: "" }), "Bypass blocking off.");
+      setBusy(false);
+    }
+  };
+
+  const confirmBypassOff = async () => {
+    setBusy(true);
+    await handle(await sendCommand({ cmd: "set_bypass_blocking", enabled: false, password: bypassPw }), "Bypass blocking off.");
+    setBypassPw("");
+    setBypassPrompt(false);
     setBusy(false);
   };
 
@@ -94,7 +121,52 @@ export default function Protection({
           <span className="t-row-title">Coverage</span>
           <span className="row-trailing t-subtitle">All browsers · DNS + hosts</span>
         </Row>
+        <Row>
+          <span className="flex flex-col">
+            <span className="t-row-title">Block bypass tools</span>
+            <span className="t-caption">Proxies, VPNs, Tor, DoH</span>
+          </span>
+          <span className="row-trailing">
+            <Switch
+              checked={bypassOn}
+              disabled={locked || busy}
+              onChange={toggleBypass}
+              label="Block bypass tools"
+            />
+          </span>
+        </Row>
       </Group>
+
+      {bypassPrompt && (
+        <div className="mt-3">
+          <p className="t-caption mb-2 px-4">
+            Enter your password to stop blocking bypass tools.
+          </p>
+          <input
+            type="password"
+            autoFocus
+            value={bypassPw}
+            onChange={(e) => setBypassPw(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && confirmBypassOff()}
+            placeholder="Password"
+            className="field"
+          />
+          <div className="mt-3 flex items-center justify-between">
+            <button
+              onClick={() => {
+                setBypassPrompt(false);
+                setBypassPw("");
+              }}
+              className="pressable text-[15px] text-text-2"
+            >
+              Cancel
+            </button>
+            <Button variant="destructive" onClick={confirmBypassOff}>
+              Turn off
+            </Button>
+          </div>
+        </div>
+      )}
 
       {pwPrompt && (
         <div className="mt-3">

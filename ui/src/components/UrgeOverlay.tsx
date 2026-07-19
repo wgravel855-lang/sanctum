@@ -1,85 +1,95 @@
 import { useEffect, useRef, useState } from "react";
 import Button from "./Button";
-import { Group, Row } from "./List";
+import BreathingOrb from "./BreathingOrb";
 
-// 4-7-8 breathing: inhale 4s, hold 7s, exhale 8s (19s cycle).
-const PHASES = [
-  { label: "Breathe in", secs: 4, scale: 1 },
-  { label: "Hold", secs: 7, scale: 1 },
-  { label: "Breathe out", secs: 8, scale: 0.55 },
-] as const;
+// The in-app "I need help now" screen. You opened it on purpose, but it still
+// holds you for a short breath before the exit appears — the pause is the whole
+// point, so it can't be closed instantly.
+
+const PAUSE_SECS = 30;
 
 const DISTRACTIONS = [
   "Stand up and get a glass of water.",
-  "Step outside for two minutes of fresh air.",
-  "Text someone you trust just to say hi.",
+  "Step outside for two minutes of air.",
+  "Text someone you trust, just to say hi.",
 ];
 
-const SESSION_SECS = 120;
+function messageAt(elapsed: number): string {
+  if (elapsed < 12) return "You came here instead of giving in. That was the strong move.";
+  if (elapsed < 24) return "Let the breath be the only thing you're doing right now.";
+  return "The wave is already on its way back down.";
+}
 
 export default function UrgeOverlay({ onClose }: { onClose: () => void }) {
-  const [phase, setPhase] = useState(0);
-  const [remaining, setRemaining] = useState(SESSION_SECS);
+  const [elapsed, setElapsed] = useState(0);
+  const [stage, setStage] = useState<"breathe" | "ramp">("breathe");
   const reduced = useRef(
     typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
 
   useEffect(() => {
-    const t = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000);
+    if (stage !== "breathe") return;
+    const t = setInterval(() => {
+      setElapsed((e) => {
+        if (e + 1 >= PAUSE_SECS) {
+          clearInterval(t);
+          setStage("ramp");
+          return PAUSE_SECS;
+        }
+        return e + 1;
+      });
+    }, 1000);
     return () => clearInterval(t);
-  }, []);
-
-  useEffect(() => {
-    const t = setTimeout(
-      () => setPhase((p) => (p + 1) % PHASES.length),
-      PHASES[phase].secs * 1000,
-    );
-    return () => clearTimeout(t);
-  }, [phase]);
-
-  const current = PHASES[phase];
-  const mm = Math.floor(remaining / 60);
-  const ss = String(remaining % 60).padStart(2, "0");
+  }, [stage]);
 
   return (
-    <div className="screen fixed inset-0 z-50 flex flex-col items-center overflow-y-auto bg-bg px-5 py-12 text-center">
-      <p className="t-label">This will pass</p>
+    <div className="fade-in fixed inset-0 z-50 flex flex-col items-center justify-center overflow-y-auto bg-bg px-8 py-12 text-center">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--accent) 9%, transparent) 0%, transparent 46%), radial-gradient(circle at 50% 46%, transparent 30%, color-mix(in srgb, var(--bg) 78%, black) 100%)",
+        }}
+      />
 
-      <div className="relative mt-12 flex h-56 w-56 items-center justify-center">
-        <div
-          className="absolute h-40 w-40 rounded-full bg-accent-soft"
-          style={{
-            transform: reduced.current ? "scale(1)" : `scale(${current.scale + 0.45})`,
-            transition: reduced.current ? "none" : `transform ${current.secs}s ease-in-out`,
-          }}
-        />
-        <div className="relative z-10">
-          <div className="t-title">{current.label}</div>
-          <div className="t-subtitle mt-1 tnum">{current.secs}s</div>
+      {stage === "breathe" && (
+        <div className="relative flex flex-col items-center">
+          <p className="t-label">This will pass</p>
+          <div className="mt-8">
+            <BreathingOrb elapsed={elapsed} totalSecs={PAUSE_SECS} reduced={reduced.current} />
+          </div>
+          <p className="t-body mt-8 max-w-md text-balance text-text-2">{messageAt(elapsed)}</p>
         </div>
-      </div>
+      )}
 
-      <div className="mt-12 t-title tnum">
-        {mm}:{ss}
-      </div>
-      <p className="t-caption mt-1">Stay for two minutes.</p>
+      {stage === "ramp" && (
+        <div className="fade-in relative flex w-full max-w-md flex-col items-center">
+          <p className="t-title text-balance">You stayed with it.</p>
+          <p className="t-body mt-3 max-w-sm text-balance text-text-2">
+            That's the rep. If it helps, do one of these next.
+          </p>
 
-      <div className="mt-10 w-full max-w-xs">
-        <Group>
-          {DISTRACTIONS.map((d) => (
-            <Row key={d}>
-              <span className="t-body">{d}</span>
-            </Row>
-          ))}
-        </Group>
-      </div>
+          <div className="mt-8 w-full space-y-2">
+            {DISTRACTIONS.map((d) => (
+              <div
+                key={d}
+                className="flex items-center gap-3 rounded-[12px] border border-hairline bg-surface-1/60 px-4 py-3.5 text-left t-body"
+              >
+                <span className="h-1.5 w-1.5 flex-none rounded-full bg-accent" />
+                {d}
+              </div>
+            ))}
+          </div>
 
-      <div className="mt-10 w-full max-w-xs">
-        <Button variant="secondary" onClick={onClose}>
-          {remaining === 0 ? "I'm okay now" : "Close"}
-        </Button>
-      </div>
+          <div className="mt-10 w-full max-w-xs">
+            <Button variant="secondary" onClick={onClose}>
+              I'm okay now
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

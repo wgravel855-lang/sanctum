@@ -549,15 +549,108 @@ pub fn install() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn uninstall() -> anyhow::Result<()> {
+/// The result of an uninstall attempt. The CLI maps this to an exit code +
+/// message; the NSIS uninstaller branches on the code to show the right reason.
+pub enum UninstallOutcome {
+    Removed,
+    Refused { code: i32, message: String },
+}
+
+const UNINSTALL_ARM_KV: &str = "uninstall_requested_at";
+/// Window to actually complete the uninstall after the cooldown elapses, before
+/// the request goes stale and must be re-armed (so a months-old arm can't grant
+/// an instant removal later).
+const UNINSTALL_GRACE_HOURS: i64 = 72;
+
+/// Pure decision for the uninstall cooldown, given the armed timestamp (if any)
+/// and the current time (unix seconds). Extracted so the friction rules are
+/// unit-tested without touching the SCM or a real clock.
+#[derive(Debug, PartialEq, Eq)]
+enum CooldownDecision {
+    /// Cooldown satisfied within the completion window — remove now.
+    Proceed,
+    /// Not armed, or the arm went stale — (re)arm and refuse.
+    Arm,
+    /// Still counting down; `left_h` hours remain.
+    Waiting { left_h: i64 },
+}
+
+fn cooldown_decision(armed: Option<i64>, now: i64, cooldown_s: i64, grace_s: i64) -> CooldownDecision {
+    match armed {
+        Some(t) if now - t >= 0 && now - t < cooldown_s => {
+            let left_h = ((cooldown_s - (now - t)) as f64 / 3600.0).ceil() as i64;
+            CooldownDecision::Waiting { left_h }
+        }
+        Some(t) if now - t >= cooldown_s && now - t <= cooldown_s + grace_s => {
+            CooldownDecision::Proceed
+        }
+        _ => CooldownDecision::Arm,
+    }
+}
+
+pub fn uninstall() -> anyhow::Result<UninstallOutcome> {
     use windows_service::service::ServiceAccess;
     use windows_service::service_manager::ServiceManagerAccess;
 
-    if is_locked() && !in_safe_mode() {
-        anyhow::bail!(
-            "A locked Sanctum session is active. It can't be uninstalled until the timer ends. \
-             To remove it sooner, reboot Windows into Safe Mode — that friction is the point."
-        );
+    let safe = in_safe_mode();
+
+    if is_locked() && !safe {
+        return Ok(UninstallOutcome::Refused {
+            code: 2,
+            message: "A locked Sanctum session is active. It can't be uninstalled until the \
+                      timer ends. To remove it sooner, reboot Windows into Safe Mode — that \
+                      friction is the point."
+                .into(),
+        });
+    }
+
+    // Uninstall cooldown: Cold-Turkey friction for the UNLOCKED case, so a
+    // moment's impulse can't remove Sanctum outright. Safe Mode always bypasses
+    // it (the honest escape), exactly like the lock.
+    if !safe {
+        if let Ok(db) = Db::open(paths::db_path()) {
+            let cooldown_h = db
+                .load_config()
+                .map(|c| c.uninstall_cooldown_hours as i64)
+                .unwrap_or(24);
+            if cooldown_h > 0 {
+                let now = chrono::Utc::now().timestamp();
+                let cooldown_s = cooldown_h * 3600;
+                let grace_s = UNINSTALL_GRACE_HOURS * 3600;
+                let armed = db
+                    .get_kv(UNINSTALL_ARM_KV)
+                    .ok()
+                    .flatten()
+                    .and_then(|s| s.parse::<i64>().ok());
+                match cooldown_decision(armed, now, cooldown_s, grace_s) {
+                    CooldownDecision::Waiting { left_h } => {
+                        return Ok(UninstallOutcome::Refused {
+                            code: 4,
+                            message: format!(
+                                "Sanctum's uninstall cooldown is still counting down (about {left_h} h \
+                                 left). Run the uninstaller again after it ends, or reboot into Safe \
+                                 Mode and run sanctum-recover.exe to remove it now."
+                            ),
+                        });
+                    }
+                    CooldownDecision::Proceed => {
+                        let _ = db.set_kv(UNINSTALL_ARM_KV, "");
+                    }
+                    CooldownDecision::Arm => {
+                        let _ = db.set_kv(UNINSTALL_ARM_KV, &now.to_string());
+                        return Ok(UninstallOutcome::Refused {
+                            code: 3,
+                            message: format!(
+                                "To keep an impulse from removing it, Sanctum uninstall is on a \
+                                 {cooldown_h}-hour cooldown. It's now armed — run the uninstaller \
+                                 again after about {cooldown_h} hours to finish. (Reboot into Safe \
+                                 Mode + sanctum-recover.exe removes it immediately.)"
+                            ),
+                        });
+                    }
+                }
+            }
+        }
     }
 
     // Take enforcement down cleanly before removing the services.
@@ -565,6 +658,9 @@ pub fn uninstall() -> anyhow::Result<()> {
     engine.restore_adapters().ok();
     engine.remove_hosts_floor().ok();
     crate::firewall::remove();
+    if let Ok(db) = Db::open(paths::db_path()) {
+        crate::browser_policy::remove(&db);
+    }
 
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
     // Remove the watchdog FIRST so it can't restart the service mid-teardown.
@@ -578,5 +674,52 @@ pub fn uninstall() -> anyhow::Result<()> {
         }
     }
     tracing::info!("uninstalled Sanctum services");
-    Ok(())
+    Ok(UninstallOutcome::Removed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{cooldown_decision, CooldownDecision};
+
+    const H: i64 = 3600;
+
+    #[test]
+    fn unarmed_arms_and_refuses() {
+        assert_eq!(cooldown_decision(None, 1_000_000, 24 * H, 72 * H), CooldownDecision::Arm);
+    }
+
+    #[test]
+    fn within_cooldown_waits_with_ceil_hours() {
+        // Armed 1h ago, 24h cooldown -> ~23h remain.
+        let now = 1_000_000;
+        assert_eq!(
+            cooldown_decision(Some(now - 1 * H), now, 24 * H, 72 * H),
+            CooldownDecision::Waiting { left_h: 23 }
+        );
+        // 30 minutes left rounds UP to 1h, never 0 while still waiting.
+        assert_eq!(
+            cooldown_decision(Some(now - (24 * H - 1800)), now, 24 * H, 72 * H),
+            CooldownDecision::Waiting { left_h: 1 }
+        );
+    }
+
+    #[test]
+    fn after_cooldown_within_grace_proceeds() {
+        let now = 1_000_000;
+        assert_eq!(cooldown_decision(Some(now - 24 * H), now, 24 * H, 72 * H), CooldownDecision::Proceed);
+        assert_eq!(cooldown_decision(Some(now - 30 * H), now, 24 * H, 72 * H), CooldownDecision::Proceed);
+    }
+
+    #[test]
+    fn stale_arm_past_grace_rearms() {
+        let now = 1_000_000;
+        // 24h cooldown + 72h grace = 96h; older than that must re-arm, not grant.
+        assert_eq!(cooldown_decision(Some(now - 200 * H), now, 24 * H, 72 * H), CooldownDecision::Arm);
+    }
+
+    #[test]
+    fn future_timestamp_clock_skew_rearms() {
+        let now = 1_000_000;
+        assert_eq!(cooldown_decision(Some(now + 5 * H), now, 24 * H, 72 * H), CooldownDecision::Arm);
+    }
 }

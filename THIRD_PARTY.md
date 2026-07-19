@@ -17,4 +17,16 @@ parent entry already covers every subdomain). To refresh it:
 py tools/fetch_blocklist.py
 ```
 
+## Bypass-tool blocklist
+
+`blocklist/bypass-domains.txt` is compiled (by the same script) from the
+**hagezi/dns-blocklists** DoH/VPN/Proxy/Tor bypass list:
+
+- Source: https://github.com/hagezi/dns-blocklists (wildcard/doh-vpn-proxy-bypass-onlydomains.txt)
+- License: GPL-3.0 (the same license Sanctum ships under)
+
+It blocks the DNS-over-HTTPS resolvers, VPN/proxy services, and Tor entry
+points commonly used to route around a DNS content filter. Same validation and
+parent-pruning as the adult list.
+
 Thank you to the maintainers of these lists.

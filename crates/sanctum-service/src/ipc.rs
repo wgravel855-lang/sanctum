@@ -258,6 +258,31 @@ impl IpcHandler {
                 Response::Ok
             }
 
+            Command::SetBypassBlocking { enabled, password } => {
+                // Turning it OFF is a weakening op: password-gated + frozen while
+                // locked. Turning it ON always allowed (strengthens).
+                if !enabled {
+                    if locked {
+                        return Ok(denied(
+                            "Bypass blocking can't be turned off during a locked session.",
+                        ));
+                    }
+                    if !check_password(&db, &password)? {
+                        return Ok(denied("Incorrect password."));
+                    }
+                }
+                let mut cfg = db.load_config()?;
+                cfg.block_bypass = enabled;
+                db.save_config(&cfg)?;
+                self.apply_enforcement(&db)?;
+                db.record_event(
+                    if enabled { "bypass_on" } else { "bypass_off" },
+                    "",
+                    now,
+                )?;
+                Response::Ok
+            }
+
             Command::ResolveIntervention => {
                 db.record_urge_resisted(now)?;
                 Response::Ok
@@ -301,6 +326,7 @@ impl IpcHandler {
             schedule: cfg.schedule,
             blocklist_count: self.resolver.blocklist_len(),
             custom_block_count: db.list_custom_block()?.len(),
+            block_bypass: cfg.block_bypass,
             has_password: db.has_password()?,
             all_browsers: true,
         })

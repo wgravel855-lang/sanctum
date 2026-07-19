@@ -16,7 +16,7 @@ use std::time::Duration;
 use serde_json::json;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{Emitter, Manager, WindowEvent};
+use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, WindowEvent};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::windows::named_pipe::ClientOptions;
@@ -80,14 +80,68 @@ fn show_window(app: &tauri::AppHandle, label: &str) {
 
 /// Raise the intervention window at Phase 1, carrying the triggering domain
 /// (empty for a manual "I need help now").
+///
+/// The window is sized to span EVERY monitor (their union bounds), not just
+/// made fullscreen on one — otherwise the urge simply moves to screen two on a
+/// multi-monitor setup. Fullscreen is per-monitor, so we position + size the
+/// borderless window across the whole virtual desktop instead.
 fn open_intervention(app: &tauri::AppHandle, domain: &str) {
     if let Some(w) = app.get_webview_window("intervention") {
-        let _ = w.set_fullscreen(true);
+        match w.available_monitors() {
+            Ok(monitors) if !monitors.is_empty() => {
+                let mut left = i32::MAX;
+                let mut top = i32::MAX;
+                let mut right = i32::MIN;
+                let mut bottom = i32::MIN;
+                for m in &monitors {
+                    let p = m.position();
+                    let s = m.size();
+                    left = left.min(p.x);
+                    top = top.min(p.y);
+                    right = right.max(p.x + s.width as i32);
+                    bottom = bottom.max(p.y + s.height as i32);
+                }
+                let _ = w.set_fullscreen(false);
+                let _ = w.set_position(PhysicalPosition::new(left, top));
+                let _ = w.set_size(PhysicalSize::new(
+                    (right - left).max(1) as u32,
+                    (bottom - top).max(1) as u32,
+                ));
+
+                // So the content centers on ONE screen (not the bezel seam),
+                // emit the primary monitor's frame in LOGICAL px, relative to
+                // the union's top-left. Fallback: the first monitor.
+                let scale = w.scale_factor().unwrap_or(1.0).max(0.1);
+                let primary = w.primary_monitor().ok().flatten().or_else(|| {
+                    w.available_monitors().ok().and_then(|m| m.into_iter().next())
+                });
+                let frame = primary.map(|m| {
+                    let p = m.position();
+                    let s = m.size();
+                    json!({
+                        "x": (p.x - left) as f64 / scale,
+                        "y": (p.y - top) as f64 / scale,
+                        "w": s.width as f64 / scale,
+                        "h": s.height as f64 / scale,
+                    })
+                });
+                let _ = w.set_always_on_top(true);
+                let _ = w.show();
+                let _ = w.set_focus();
+                let _ = w.emit("intervention-open", json!({ "domain": domain, "frame": frame }));
+                return;
+            }
+            // No monitor info: fall back to single-screen fullscreen.
+            _ => {
+                let _ = w.set_fullscreen(true);
+            }
+        }
+        let _ = w.set_always_on_top(true);
         let _ = w.show();
         let _ = w.set_focus();
         // The webview is pre-loaded (hidden) at startup, so the listener is
         // already attached — this resets it to Phase 1 with the new domain.
-        let _ = w.emit("intervention-open", json!({ "domain": domain }));
+        let _ = w.emit("intervention-open", json!({ "domain": domain, "frame": null }));
     }
 }
 

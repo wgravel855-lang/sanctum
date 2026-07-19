@@ -20,7 +20,15 @@ fn main() -> anyhow::Result<()> {
     match cmd.as_str() {
         "run" => service::run(),
         "install" => service::install(),
-        "uninstall" => service::uninstall(),
+        "uninstall" => match service::uninstall()? {
+            service::UninstallOutcome::Removed => Ok(()),
+            service::UninstallOutcome::Refused { code, message } => {
+                // Authoritative, user-facing reason on stdout; the NSIS
+                // uninstaller branches on the exit code to show the right box.
+                println!("{message}");
+                std::process::exit(code);
+            }
+        },
         "console" => service::console(),
         other => {
             eprintln!("sanctum-service: unknown command {other:?}");

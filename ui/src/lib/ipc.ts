@@ -27,6 +27,7 @@ const mockStatus: Status = {
   schedule: { mode: "always_on" },
   blocklist_count: 47621,
   custom_block_count: 2,
+  block_bypass: true,
   has_password: false,
   all_browsers: true,
 };
@@ -105,6 +106,14 @@ async function mockCommand(cmd: Command): Promise<Response> {
       return { resp: "ok" };
     case "enable_protection":
       mockStatus.protection_active = true;
+      return { resp: "ok" };
+    case "set_bypass_blocking":
+      if (!cmd.enabled) {
+        if (mockStatus.locked)
+          return { resp: "denied", body: { reason: "Can't turn off during a locked session." } };
+        if (!gate(cmd.password)) return { resp: "denied", body: { reason: "Incorrect password." } };
+      }
+      mockStatus.block_bypass = cmd.enabled;
       return { resp: "ok" };
     case "resolve_intervention":
       mockStatus.urges_resisted += 1;

@@ -9,6 +9,8 @@ use std::sync::OnceLock;
 const ADULT: &str = include_str!("../../../blocklist/adult-domains.txt");
 /// Bulk compiled list (StevenBlack porn extension, MIT; see THIRD_PARTY.md).
 const ADULT_FULL: &str = include_str!("../../../blocklist/adult-domains-full.txt");
+/// Bypass-tool list: DoH/VPN/proxy/Tor (hagezi, GPL-3.0; see THIRD_PARTY.md).
+const BYPASS: &str = include_str!("../../../blocklist/bypass-domains.txt");
 const DOH: &str = include_str!("../../../blocklist/doh-endpoints.txt");
 const SAFESEARCH: &str = include_str!("../../../blocklist/safesearch.map");
 
@@ -34,6 +36,13 @@ pub fn curated_blocklist() -> Blocklist {
 
 pub fn doh_list() -> Blocklist {
     Blocklist::parse(DOH).0
+}
+
+/// Bypass-tool block set (DoH resolvers, VPN/proxy services, Tor). ~17k
+/// entries, parsed once per process behind a `OnceLock`.
+pub fn bypass_blocklist() -> Blocklist {
+    static BYPASS_SET: OnceLock<Blocklist> = OnceLock::new();
+    BYPASS_SET.get_or_init(|| Blocklist::parse(BYPASS).0).clone()
 }
 
 pub fn safesearch_map() -> SafeSearchMap {
@@ -70,6 +79,11 @@ mod tests {
             starter_blocklist().len()
         );
         assert!(doh_list().len() >= 10);
+        assert!(
+            bypass_blocklist().len() >= 10_000,
+            "bypass list missing or truncated: {}",
+            bypass_blocklist().len()
+        );
         assert!(!safesearch_map().is_empty());
     }
 

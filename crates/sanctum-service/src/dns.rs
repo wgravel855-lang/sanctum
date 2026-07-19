@@ -51,11 +51,13 @@ enum Decision {
 }
 
 /// Which list produced a sink. Only adult-block hits are treated as "urges"
-/// for the intervention system; DoH-endpoint sinks are plumbing, not intent.
+/// for the intervention system; DoH-endpoint and bypass-tool sinks are
+/// plumbing (blocking a proxy or VPN lookup is not an urge moment).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SinkKind {
     Blocked,
     Doh,
+    Bypass,
 }
 
 /// The hot-reloadable filter lists + toggles.
@@ -67,8 +69,12 @@ pub struct FilterState {
     pub safesearch: SafeSearchMap,
     /// DoH provider hostnames, matched by suffix like the blocklist.
     pub doh: Blocklist,
+    /// Bypass tools (DoH/VPN/proxy/Tor), matched by suffix. Blocked when
+    /// `block_bypass` is on, so a locked session also seals the escape hatches.
+    pub bypass: Blocklist,
     pub enforce_safesearch: bool,
     pub block_doh: bool,
+    pub block_bypass: bool,
 }
 
 impl FilterState {
@@ -78,8 +84,10 @@ impl FilterState {
             allowlist: HashSet::new(),
             safesearch,
             doh,
+            bypass: Blocklist::new(),
             enforce_safesearch: true,
             block_doh: true,
+            block_bypass: false,
         }
     }
 
@@ -98,6 +106,8 @@ impl FilterState {
             Decision::Sink(SinkKind::Blocked)
         } else if self.block_doh && self.doh.is_blocked(host) {
             Decision::Sink(SinkKind::Doh)
+        } else if self.block_bypass && self.bypass.is_blocked(host) {
+            Decision::Sink(SinkKind::Bypass)
         } else if self.enforce_safesearch {
             match self.safesearch.lookup(host) {
                 Some(target) => Decision::SafeSearch(target.to_string()),
@@ -200,6 +210,9 @@ impl Resolver {
                 self.sink_response(&req, &q)
             }
             Decision::Sink(SinkKind::Doh) => self.sink_response(&req, &q),
+            // Bypass tools sinkhole like DoH endpoints: blocked, but not fed to
+            // the intervention debouncer (a proxy lookup isn't an urge moment).
+            Decision::Sink(SinkKind::Bypass) => self.sink_response(&req, &q),
             Decision::SafeSearch(target) => self.safesearch_response(&req, &q, &target).await,
         };
         response.to_vec().ok()
@@ -431,6 +444,23 @@ mod tests {
             Decision::SafeSearch("forcesafesearch.google.com".into())
         );
         assert_eq!(r.classify("example.org"), Decision::Forward);
+    }
+
+    #[test]
+    fn bypass_blocking_is_gated_by_the_flag() {
+        let r = resolver();
+        // Off by default in the test constructor -> a proxy domain forwards.
+        let mut st = r.state.read().unwrap().clone();
+        st.bypass.add("croxyproxy.com");
+        r.update(st.clone());
+        assert_eq!(r.classify("www.croxyproxy.com"), Decision::Forward);
+
+        // Turn it on -> the same host (and its subdomains) sinkhole as Bypass,
+        // which does NOT feed the intervention debouncer.
+        st.block_bypass = true;
+        r.update(st);
+        assert_eq!(r.classify("croxyproxy.com"), Decision::Sink(SinkKind::Bypass));
+        assert_eq!(r.classify("www.croxyproxy.com"), Decision::Sink(SinkKind::Bypass));
     }
 
     #[test]

@@ -46,6 +46,10 @@ pub enum Command {
     DisableProtection { password: String },
     /// Turn protection back on.
     EnableProtection,
+    /// Toggle bypass-tool blocking (proxies/VPN/Tor/DoH). Enabling is always
+    /// allowed (strengthens); disabling is password-gated and frozen while
+    /// locked.
+    SetBypassBlocking { enabled: bool, password: String },
     /// Wipe the activity log immediately.
     DeleteHistory,
     /// Poll for a pending block-moment intervention (v0.1.5 §A). The UI calls
@@ -119,6 +123,9 @@ pub struct Status {
     /// List screen manages and counts.
     #[serde(default)]
     pub custom_block_count: usize,
+    /// Whether bypass-tool blocking (proxies/VPN/Tor/DoH) is on.
+    #[serde(default)]
+    pub block_bypass: bool,
     pub has_password: bool,
     /// The "All browsers protected" status line.
     pub all_browsers: bool,

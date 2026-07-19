@@ -259,6 +259,8 @@ pub fn filter_state_from_db(db: &Db) -> anyhow::Result<(FilterState, Blocklist)>
     state.allowlist = allowlist;
     state.enforce_safesearch = cfg.enforce_safesearch;
     state.block_doh = cfg.block_doh;
+    state.bypass = lists::bypass_blocklist();
+    state.block_bypass = cfg.block_bypass;
     Ok((state, block))
 }
 

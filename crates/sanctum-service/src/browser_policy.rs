@@ -50,6 +50,11 @@ fn targets() -> Vec<Target> {
             key: r"SOFTWARE\Policies\BraveSoftware\Brave",
             values: CHROMIUM_OFF,
         },
+        // Vivaldi honors the Chromium enterprise policy schema under its own key.
+        Target {
+            key: r"SOFTWARE\Policies\Vivaldi",
+            values: CHROMIUM_OFF,
+        },
         Target {
             key: r"SOFTWARE\Policies\Mozilla\Firefox\DNSOverHTTPS",
             values: FIREFOX_OFF,

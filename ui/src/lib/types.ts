@@ -26,6 +26,7 @@ export interface Status {
   schedule: Schedule;
   blocklist_count: number;
   custom_block_count: number;
+  block_bypass: boolean;
   has_password: boolean;
   all_browsers: boolean;
 }
@@ -51,6 +52,7 @@ export type Command =
   | { cmd: "verify_password"; password: string }
   | { cmd: "disable_protection"; password: string }
   | { cmd: "enable_protection" }
+  | { cmd: "set_bypass_blocking"; enabled: boolean; password: string }
   | { cmd: "delete_history" }
   | { cmd: "poll_intervention" }
   | { cmd: "trigger_intervention" }
