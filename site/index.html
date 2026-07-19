@@ -246,11 +246,15 @@
       .hero-mock {
         min-width: 0;
       }
-      /* asymmetry: on desktop the product mockup drifts right and crops a
-         sliver (~5%) off the viewport edge. Returns to center below 1024px. */
+      /* asymmetry: on desktop the product mockup bleeds a fixed ~28px past the
+         container's right edge (card sits 24px inside it, so translateX 52px =
+         28px overhang). Anchored to the content on every width — it only crops
+         off the screen when the container edge nears the viewport edge (narrow
+         desktops); on wide screens it stays a subtle overhang, never detaching.
+         Returns to center below 1024px. */
       @media (min-width: 1024px) {
         .hero-mock {
-          transform: translateX(calc((100vw - var(--maxw)) / 2 + 31px));
+          transform: translateX(52px);
         }
       }
       .hero-grid {
