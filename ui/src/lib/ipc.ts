@@ -19,12 +19,13 @@ const mockStatus: Status = {
   blocking_now: true,
   degraded: false,
   total_blocked: 14382,
+  urges_resisted: 34,
   protected_days: 27,
   streak: 12,
   locked: false,
   locked_until: null,
   schedule: { mode: "always_on" },
-  blocklist_count: 61240,
+  blocklist_count: 47621,
   has_password: false,
   all_browsers: true,
 };
@@ -42,6 +43,8 @@ let mockEvents: EventDto[] = (() => {
 })();
 let mockPassword: string | null = null;
 let mockCustomBlocks: string[] = ["distracting-site.net", "one-more-thing.com"];
+let mockLetter: string | null =
+  "Remember why you started. The version of you that set this up was thinking clearly and wanted better for you. This feeling passes. You are not missing anything real.";
 
 function gate(password: string): boolean {
   return mockPassword === null || mockPassword === password;
@@ -100,6 +103,14 @@ async function mockCommand(cmd: Command): Promise<Response> {
     case "enable_protection":
       mockStatus.protection_active = true;
       return { resp: "ok" };
+    case "resolve_intervention":
+      mockStatus.urges_resisted += 1;
+      return { resp: "ok" };
+    case "get_letter":
+      return { resp: "letter", body: mockLetter };
+    case "set_letter":
+      mockLetter = cmd.text.trim() || null;
+      return { resp: "ok" };
     default:
       return { resp: "ok" };
   }
@@ -125,4 +136,13 @@ export async function recentEvents(limit = 50): Promise<EventDto[]> {
 export async function listCustomBlocks(): Promise<string[]> {
   const r = await sendCommand({ cmd: "list_custom_blocks" });
   return r.resp === "custom_blocks" ? r.body : [];
+}
+
+export async function getLetter(): Promise<string | null> {
+  const r = await sendCommand({ cmd: "get_letter" });
+  return r.resp === "letter" ? r.body : null;
+}
+
+export async function setLetter(text: string): Promise<Response> {
+  return sendCommand({ cmd: "set_letter", text });
 }

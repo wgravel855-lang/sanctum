@@ -58,6 +58,11 @@ pub enum Command {
     /// The user closed an intervention window (no bypass exists). Logs an
     /// urge-resisted event for the no-shame progress view.
     ResolveIntervention,
+    /// Fetch the user's "letter to self" (shown during the block-moment pause).
+    GetLetter,
+    /// Save the letter to self. Always allowed: it can only strengthen resolve,
+    /// never weakens protection, so it is not frozen during a locked session.
+    SetLetter { text: String },
 }
 
 /// Responses from the service.
@@ -82,6 +87,8 @@ pub enum Response {
     Error { message: String },
     /// The result of a `PollIntervention` (v0.1.5 §A).
     Intervention(InterventionDto),
+    /// The user's letter to self (`None` if never written).
+    Letter(Option<String>),
 }
 
 /// Everything the home screen needs, in one round-trip.
@@ -96,6 +103,10 @@ pub struct Status {
     pub degraded: bool,
     /// Lifetime count of blocked lookups ("N harmful sites blocked").
     pub total_blocked: u64,
+    /// Lifetime count of urges resisted (intervention windows closed without a
+    /// bypass). Preserved across history wipes — the honest, positive number.
+    #[serde(default)]
+    pub urges_resisted: u64,
     pub protected_days: u64,
     pub streak: u64,
     pub locked: bool,
@@ -126,6 +137,10 @@ pub struct InterventionDto {
     /// Interventions that fired while the UI wasn't polling — surfaced as a
     /// quiet "urges happened while you were away" summary, then cleared.
     pub urges_while_away: u32,
+    /// The user's letter to self, attached when `pending` so the block-moment
+    /// window can show it without a second round-trip. `None` if unwritten.
+    #[serde(default)]
+    pub letter: Option<String>,
 }
 
 /// Encode any protocol value to bytes (JSON).

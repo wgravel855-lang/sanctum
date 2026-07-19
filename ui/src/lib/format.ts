@@ -32,6 +32,8 @@ function humanEvent(kind: string): string {
       return "Turned protection on";
     case "block_add":
       return "Added a site to the block list";
+    case "urge_resisted":
+      return "Resisted an urge";
     default:
       return kind.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
   }

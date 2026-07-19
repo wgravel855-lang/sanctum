@@ -85,7 +85,17 @@ impl IpcHandler {
         // roughly once a second).
         match &cmd {
             Command::PollIntervention => {
-                return Ok(Response::Intervention(self.intervention.poll()));
+                let mut dto = self.intervention.poll();
+                // Only touch the DB on the rare tick that actually arms a
+                // window — attach the letter so the pause can show it with no
+                // second round-trip. The common (nothing-pending) poll stays
+                // DB-free.
+                if dto.pending {
+                    if let Ok(db) = self.db() {
+                        dto.letter = db.get_letter().unwrap_or(None);
+                    }
+                }
+                return Ok(Response::Intervention(dto));
             }
             Command::TriggerIntervention => {
                 self.intervention.trigger_manual();
@@ -249,7 +259,16 @@ impl IpcHandler {
             }
 
             Command::ResolveIntervention => {
-                db.record_event("urge_resisted", "", now)?;
+                db.record_urge_resisted(now)?;
+                Response::Ok
+            }
+
+            Command::GetLetter => Response::Letter(db.get_letter()?),
+
+            // The letter can only strengthen resolve, so it is never frozen —
+            // writable even during a locked session.
+            Command::SetLetter { text } => {
+                db.set_letter(&text)?;
                 Response::Ok
             }
 
@@ -274,6 +293,7 @@ impl IpcHandler {
             blocking_now,
             degraded: false,
             total_blocked: db.total_blocks()?,
+            urges_resisted: db.total_urges_resisted()?,
             protected_days: db.total_protected_days()?,
             streak: db.current_streak()?,
             locked,

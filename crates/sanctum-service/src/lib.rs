@@ -1,6 +1,7 @@
 //! Library surface for the Sanctum service, so the enforcement modules are
 //! integration-testable independently of the `windows-service` host binary.
 
+pub mod browser_policy;
 pub mod dns;
 pub mod engine;
 pub mod firewall;

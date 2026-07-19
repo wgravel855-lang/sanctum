@@ -18,6 +18,7 @@ export interface Status {
   blocking_now: boolean;
   degraded: boolean;
   total_blocked: number;
+  urges_resisted: number;
   protected_days: number;
   streak: number;
   locked: boolean;
@@ -52,12 +53,15 @@ export type Command =
   | { cmd: "delete_history" }
   | { cmd: "poll_intervention" }
   | { cmd: "trigger_intervention" }
-  | { cmd: "resolve_intervention" };
+  | { cmd: "resolve_intervention" }
+  | { cmd: "get_letter" }
+  | { cmd: "set_letter"; text: string };
 
 export interface InterventionDto {
   pending: boolean;
   domain: string | null;
   urges_while_away: number;
+  letter?: string | null;
 }
 
 export type Response =
@@ -68,4 +72,5 @@ export type Response =
   | { resp: "ok" }
   | { resp: "denied"; body: { reason: string } }
   | { resp: "error"; body: { message: string } }
-  | { resp: "intervention"; body: InterventionDto };
+  | { resp: "intervention"; body: InterventionDto }
+  | { resp: "letter"; body: string | null };

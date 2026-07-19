@@ -90,6 +90,9 @@ export default function Home({
         <HeartIcon className="h-4 w-4 text-accent" />
         I need help now
       </button>
+      <p className="t-caption mt-3">
+        or press <span className="tnum text-text-1">Ctrl+Shift+H</span> from anywhere
+      </p>
     </div>
   );
 }

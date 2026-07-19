@@ -10,7 +10,7 @@
 //! booting Safe Mode and running this is *the* documented way out.
 
 use sanctum_core::{paths, Db};
-use sanctum_service::{firewall, hostsfile, netcfg};
+use sanctum_service::{browser_policy, firewall, hostsfile, netcfg};
 
 fn main() {
     println!("Sanctum recovery — restoring your network and removing Sanctum's changes.\n");
@@ -32,10 +32,18 @@ fn main() {
     firewall::remove();
     println!("Removed Sanctum firewall rules.");
 
-    // 4. Flush the DNS cache.
+    // 4. Remove the browser DoH policies (journal-exact if available, else
+    //    delete only values that are exactly Sanctum's).
+    match Db::open(paths::db_path()) {
+        Ok(db) => browser_policy::remove(&db),
+        Err(_) => browser_policy::force_remove_ours(),
+    }
+    println!("Removed Sanctum browser DoH policies.");
+
+    // 5. Flush the DNS cache.
     let _ = netcfg::flush_dns_cache();
 
-    // 5. Print the manual fallback commands.
+    // 6. Print the manual fallback commands.
     print_manual_commands();
 
     println!(

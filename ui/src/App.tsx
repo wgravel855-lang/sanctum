@@ -6,9 +6,16 @@ import Protection from "./screens/Protection";
 import Schedule from "./screens/Schedule";
 import BlockList from "./screens/BlockList";
 import Progress from "./screens/Progress";
+import Letter from "./screens/Letter";
 import UrgeOverlay from "./components/UrgeOverlay";
 
-export type Screen = "home" | "protection" | "schedule" | "blocklist" | "progress";
+export type Screen =
+  | "home"
+  | "protection"
+  | "schedule"
+  | "blocklist"
+  | "progress"
+  | "letter";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -45,8 +52,14 @@ export default function App() {
           <BlockList status={status} onBack={back} refresh={refresh} />
         )}
         {screen === "progress" && (
-          <Progress status={status} onBack={back} refresh={refresh} />
+          <Progress
+            status={status}
+            onBack={back}
+            refresh={refresh}
+            onOpenLetter={() => setScreen("letter")}
+          />
         )}
+        {screen === "letter" && <Letter onBack={() => setScreen("progress")} />}
       </main>
 
       {urge && <UrgeOverlay onClose={() => setUrge(false)} />}

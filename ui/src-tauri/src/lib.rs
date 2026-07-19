@@ -17,10 +17,19 @@ use serde_json::json;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Manager, WindowEvent};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::windows::named_pipe::ClientOptions;
 
 const PIPE_NAME: &str = r"\\.\pipe\sanctum-service";
+
+/// The global panic hotkey (§E): summon the breathing window from anywhere,
+/// even mid-scroll in another app. Ctrl+Shift+H ("help").
+fn panic_hotkey() -> Shortcut {
+    Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyH)
+}
+/// Human-readable form, kept in sync with `panic_hotkey` for the UI hint.
+pub const PANIC_HOTKEY_LABEL: &str = "Ctrl+Shift+H";
 const MAX_FRAME: usize = 1 << 20;
 
 async fn pipe_roundtrip(cmd: &serde_json::Value) -> Result<serde_json::Value, String> {
@@ -84,8 +93,24 @@ fn open_intervention(app: &tauri::AppHandle, domain: &str) {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(
+            // Only one shortcut is ever registered, so any Pressed event is the
+            // panic hotkey — raise the intervention window.
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    if event.state() == ShortcutState::Pressed {
+                        open_intervention(app, "");
+                    }
+                })
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![get_status, send_command])
         .setup(|app| {
+            // Register the global panic hotkey. Non-fatal if another app owns
+            // the combo — the tray "I need help now" is always available too.
+            if let Err(e) = app.global_shortcut().register(panic_hotkey()) {
+                eprintln!("could not register panic hotkey ({PANIC_HOTKEY_LABEL}): {e}");
+            }
             // Tray so the app (and the poller below) survive the main window
             // closing. Without it, closing the window would stop interventions.
             let open_i = MenuItem::with_id(app, "open", "Open Sanctum", true, None::<&str>)?;

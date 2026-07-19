@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Button from "../components/Button";
-import { inTauri, sendCommand } from "../lib/ipc";
+import { getLetter, inTauri, sendCommand } from "../lib/ipc";
 
 // v0.1.5 §B — the block-moment intervention window. Full-screen, always-on-top,
 // calm. Phase 1 is a non-skippable pause; only after it do exit ramps appear.
@@ -29,6 +29,7 @@ export default function InterventionWindow() {
   const [remaining, setRemaining] = useState(PAUSE_SECS);
   const [bi, setBi] = useState(0);
   const [stage, setStage] = useState<"breathe" | "ramp" | "closed">("breathe");
+  const [letter, setLetter] = useState<string | null>(null);
   const reduced = useRef(
     typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -40,15 +41,27 @@ export default function InterventionWindow() {
     setStage("breathe");
   }, []);
 
+  // Load the user's letter to self (shown in the reflection phase). Refreshed
+  // whenever the window is raised, so an edit is reflected next time.
+  const loadLetter = useCallback(() => {
+    getLetter()
+      .then(setLetter)
+      .catch(() => setLetter(null));
+  }, []);
+
   // The window is reused across urges: reset to Phase 1 each time it's raised.
   useEffect(() => {
+    loadLetter();
     if (!inTauri()) return;
     let un: (() => void) | undefined;
     import("@tauri-apps/api/event").then(({ listen }) => {
-      listen("intervention-open", () => reset()).then((u) => (un = u));
+      listen("intervention-open", () => {
+        reset();
+        loadLetter();
+      }).then((u) => (un = u));
     });
     return () => un?.();
-  }, [reset]);
+  }, [reset, loadLetter]);
 
   // The pause countdown.
   useEffect(() => {
@@ -142,11 +155,22 @@ export default function InterventionWindow() {
 
       {stage === "ramp" && (
         <div className="fade-in w-full max-w-md">
-          <p className="t-label">Your reason</p>
-          <p className="t-title mt-6">You set this block while your head was clear.</p>
-          <p className="t-body mt-4 text-text-2">
-            It's doing exactly what you asked it to. The urge is already fading.
-          </p>
+          {letter ? (
+            <>
+              <p className="t-label">A note you left yourself</p>
+              <blockquote className="mt-6 border-l-2 border-accent pl-5 text-left">
+                <p className="t-body whitespace-pre-line text-text">{letter}</p>
+              </blockquote>
+            </>
+          ) : (
+            <>
+              <p className="t-label">Your reason</p>
+              <p className="t-title mt-6">You set this block while your head was clear.</p>
+              <p className="t-body mt-4 text-text-2">
+                It's doing exactly what you asked it to. The urge is already fading.
+              </p>
+            </>
+          )}
 
           <div className="mt-10 space-y-2 text-left">
             {SUGGESTIONS.map((s) => (

@@ -223,6 +223,31 @@ impl Db {
             .unwrap_or(0))
     }
 
+    /// Record an urge resisted (an intervention closed with no bypass). Bumps a
+    /// lifetime KV counter that survives history wipes AND logs a timeline
+    /// event. This is the positive number the no-shame progress view leads on.
+    pub fn record_urge_resisted(&self, now: DateTime<Utc>) -> Result<()> {
+        let total = self.total_urges_resisted()? + 1;
+        self.set_kv("urges_resisted", &total.to_string())?;
+        self.record_event("urge_resisted", "", now)
+    }
+
+    pub fn total_urges_resisted(&self) -> Result<u64> {
+        Ok(self
+            .get_kv("urges_resisted")?
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0))
+    }
+
+    /// The user's "letter to self", shown during the block-moment pause.
+    pub fn get_letter(&self) -> Result<Option<String>> {
+        Ok(self.get_kv("letter_to_self")?.filter(|s| !s.is_empty()))
+    }
+
+    pub fn set_letter(&self, text: &str) -> Result<()> {
+        self.set_kv("letter_to_self", text.trim())
+    }
+
     pub fn record_event(&self, kind: &str, detail: &str, now: DateTime<Utc>) -> Result<()> {
         self.conn.execute(
             "INSERT INTO events(ts, kind, detail) VALUES(?1, ?2, ?3)",

@@ -182,6 +182,8 @@ impl InterventionCenter {
                 .map(|(_, d)| d)
                 .filter(|d| !d.is_empty()),
             urges_while_away: away,
+            // The IPC handler attaches the letter when pending (it has the DB).
+            letter: None,
         }
     }
 }

@@ -204,6 +204,13 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
         crate::firewall::apply(false, false)
     };
 
+    // Browser DoH policies (owner-approved): while the service runs, adapter
+    // DNS points at the resolver, so browsers must not tunnel around it with
+    // built-in DoH. Journaled first; removed on authorized teardown.
+    if let Ok(db) = Db::open(paths::db_path()) {
+        crate::browser_policy::apply(&db);
+    }
+
     on_lock(is_locked());
     mark_protected_today();
 
@@ -274,7 +281,12 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
         engine.restore_adapters().ok();
         engine.remove_hosts_floor().ok();
         crate::firewall::remove();
-        tracing::info!("authorized stop: adapters restored, HOSTS floor + firewall removed");
+        if let Ok(db) = Db::open(paths::db_path()) {
+            crate::browser_policy::remove(&db);
+        }
+        tracing::info!(
+            "authorized stop: adapters restored, HOSTS floor + firewall + browser policies removed"
+        );
     }
     Ok(())
 }
