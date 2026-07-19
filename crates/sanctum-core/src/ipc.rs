@@ -162,6 +162,10 @@ pub struct Status {
     /// Whether Twilio SMS accountability is configured.
     #[serde(default)]
     pub accountability_sms_on: bool,
+    /// If the accountability webhook is an ntfy.sh topic, the topic name (so the
+    /// UI can re-show the partner's QR). `None` for a custom webhook or when off.
+    #[serde(default)]
+    pub accountability_ntfy_topic: Option<String>,
     pub has_password: bool,
     /// The "All browsers protected" status line.
     pub all_browsers: bool,

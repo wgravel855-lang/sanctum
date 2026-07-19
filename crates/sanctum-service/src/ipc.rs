@@ -488,6 +488,12 @@ impl IpcHandler {
             cfg.protection_enabled && cfg.schedule.is_active_at(chrono::Local::now());
         let accountability_on = !cfg.accountability_webhook.trim().is_empty();
         let accountability_sms_on = cfg.sms_configured();
+        let accountability_ntfy_topic = cfg
+            .accountability_webhook
+            .trim()
+            .strip_prefix("https://ntfy.sh/")
+            .filter(|t| !t.is_empty())
+            .map(str::to_string);
         Ok(Status {
             protection_active: cfg.protection_enabled,
             blocking_now,
@@ -506,6 +512,7 @@ impl IpcHandler {
             uninstall_cooldown_hours: cfg.uninstall_cooldown_hours,
             accountability_on,
             accountability_sms_on,
+            accountability_ntfy_topic,
             has_password: db.has_password()?,
             all_browsers: true,
         })

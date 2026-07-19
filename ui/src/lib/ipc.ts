@@ -32,6 +32,7 @@ const mockStatus: Status = {
   uninstall_cooldown_hours: 0,
   accountability_on: false,
   accountability_sms_on: false,
+  accountability_ntfy_topic: null,
   has_password: false,
   all_browsers: true,
 };
@@ -147,6 +148,9 @@ async function mockCommand(cmd: Command): Promise<Response> {
       }
       mockAccountabilityWebhook = next;
       mockStatus.accountability_on = next.length > 0;
+      mockStatus.accountability_ntfy_topic = next.startsWith("https://ntfy.sh/")
+        ? next.slice("https://ntfy.sh/".length) || null
+        : null;
       return { resp: "ok" };
     }
     case "set_accountability_sms": {

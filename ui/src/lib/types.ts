@@ -31,6 +31,7 @@ export interface Status {
   uninstall_cooldown_hours: number;
   accountability_on: boolean;
   accountability_sms_on: boolean;
+  accountability_ntfy_topic: string | null;
   has_password: boolean;
   all_browsers: boolean;
 }

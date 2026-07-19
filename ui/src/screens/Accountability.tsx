@@ -1,14 +1,25 @@
 import { useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import type { Response, Status } from "../lib/types";
 import { sendCommand } from "../lib/ipc";
 import TopBar from "../components/TopBar";
 import Button from "../components/Button";
 import ConfirmModal from "../components/ConfirmModal";
-import { Group, GroupLabel, GroupFootnote, Row } from "../components/List";
+import { GroupLabel, GroupFootnote } from "../components/List";
 
-// Honest accountability: a partner gets short protection-state signals through a
-// channel the USER owns — a chat-app/push webhook OR their own Twilio SMS.
-// Sanctum runs no server and never sends browsing content.
+// Honest accountability. The one-tap default is ntfy: Sanctum generates a
+// private topic, the partner installs the free ntfy app and scans a code — the
+// user types nothing, and there's still no server or account of ours. Custom
+// webhooks and Twilio SMS are under Advanced. Signals only, never content.
+
+function genTopic(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let s = "";
+  for (const b of bytes) s += chars[b % chars.length];
+  return `sanctum-${s}`;
+}
 
 export default function Accountability({
   status,
@@ -19,7 +30,9 @@ export default function Accountability({
   onBack: () => void;
   refresh: () => void;
 }) {
+  const ntfyTopic = status?.accountability_ntfy_topic ?? null;
   const webhookOn = !!status?.accountability_on;
+  const customWebhookOn = webhookOn && !ntfyTopic;
   const smsOn = !!status?.accountability_sms_on;
   const anyOn = webhookOn || smsOn;
   const locked = !!status?.locked;
@@ -31,6 +44,7 @@ export default function Accountability({
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [password, setPassword] = useState("");
+  const [advanced, setAdvanced] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<null | "webhook" | "sms">(null);
@@ -46,6 +60,14 @@ export default function Accountability({
     setBusy(false);
   };
 
+  const setupNtfy = () =>
+    run(
+      { cmd: "set_accountability", webhook: `https://ntfy.sh/${genTopic()}`, password },
+      "Phone alerts are on. Have your partner subscribe with the code below.",
+    );
+
+  const test = () => run({ cmd: "test_accountability" }, "Test sent — ask them to confirm it arrived.");
+
   const smsComplete = sid.trim() && token.trim() && from.trim() && to.trim();
 
   return (
@@ -53,153 +75,150 @@ export default function Accountability({
       <TopBar title="Accountability" onBack={onBack} />
 
       <p className="t-body text-text-2">
-        Give a trusted person a heads-up if you ever weaken your protection. They
-        get a short note the moment protection is turned off or an uninstall
-        starts — nothing about what you browse, ever.
+        Let a trusted person know if you ever weaken your protection. They get a
+        short alert the moment protection is turned off or an uninstall starts —
+        never anything about what you browse.
       </p>
 
-      <div className="mt-6">
-        <Group>
-          <Row>
-            <span className="t-row-title">Partner</span>
-            <span className="row-trailing t-subtitle">{anyOn ? "Connected" : "Not set"}</span>
-          </Row>
-        </Group>
-      </div>
-
-      {/* Channel 1: text message via the user's own Twilio account. */}
+      {/* Hero: one-tap phone alerts via ntfy. */}
       <div className="mt-8">
-        <GroupLabel>Text message</GroupLabel>
-        {smsOn ? (
+        <GroupLabel>Phone alerts</GroupLabel>
+        {ntfyTopic ? (
           <>
-            <Group>
-              <Row>
-                <span className="t-row-title">SMS</span>
-                <span className="row-trailing t-subtitle">Connected</span>
-              </Row>
-            </Group>
-            <div className="mt-3 flex justify-center">
-              <Button variant="destructive" onClick={() => setConfirmRemove("sms")} disabled={busy || locked}>
-                Remove SMS
-              </Button>
+            <div className="rounded-[16px] border border-hairline bg-surface-1 p-5 text-center">
+              <div className="mx-auto w-fit rounded-[12px] bg-white p-3">
+                <QRCodeSVG value={`https://ntfy.sh/${ntfyTopic}`} size={168} bgColor="#ffffff" fgColor="#000000" level="M" />
+              </div>
+              <p className="t-body mt-4 text-text-1">Point your partner's phone here</p>
+              <p className="t-caption mt-2">
+                Have them install the free <span className="text-text-1">ntfy</span> app, tap +, and
+                scan this — or add the topic below on server ntfy.sh.
+              </p>
+              <p className="t-caption mt-3 break-all text-text-2">ntfy.sh/{ntfyTopic}</p>
             </div>
-          </>
-        ) : (
-          <>
-            <input value={sid} onChange={(e) => setSid(e.target.value)} placeholder="Twilio Account SID (AC…)" spellCheck={false} autoCapitalize="none" className="field" />
-            <input value={token} onChange={(e) => setToken(e.target.value)} type="password" placeholder="Twilio Auth Token" className="field mt-3" />
-            <input value={from} onChange={(e) => setFrom(e.target.value)} placeholder="Your Twilio number (+1…)" className="field mt-3" />
-            <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="Partner's phone (+1…)" className="field mt-3" />
-            <Button
-              className="mt-3"
-              disabled={busy || !smsComplete}
-              onClick={() =>
-                run(
-                  { cmd: "set_accountability_sms", sid: sid.trim(), token: token.trim(), from: from.trim(), to: to.trim(), password: "" },
-                  "SMS connected. Sent a hello text — ask them to confirm.",
-                ).then(() => {
-                  setSid(""); setToken(""); setFrom(""); setTo("");
-                })
-              }
-            >
-              Connect SMS
-            </Button>
-          </>
-        )}
-        <GroupFootnote>
-          Uses your own Twilio account (about 1¢ per text). Your auth token is
-          stored only on this PC, in Sanctum's protected local store.
-        </GroupFootnote>
-      </div>
-
-      {/* Channel 2: chat-app / push webhook (Discord, Slack, ntfy…). */}
-      <div className="mt-8">
-        <GroupLabel>Chat app or push (webhook)</GroupLabel>
-        {webhookOn ? (
-          <>
-            <Group>
-              <Row>
-                <span className="t-row-title">Webhook</span>
-                <span className="row-trailing t-subtitle">Connected</span>
-              </Row>
-            </Group>
-            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="New webhook URL (to change)" spellCheck={false} autoCapitalize="none" className="field mt-3" />
-            <div className="mt-3 flex flex-col gap-3">
-              <Button
-                disabled={busy || !url.trim() || locked}
-                onClick={() =>
-                  run({ cmd: "set_accountability", webhook: url.trim(), password }, "Webhook updated. Your previous partner was told it changed.").then(() => {
-                    setUrl(""); setPassword("");
-                  })
-                }
-              >
-                Save new webhook
+            <div className="mt-4 flex flex-col gap-3">
+              <Button variant="secondary" onClick={test} disabled={busy}>
+                Send a test alert
               </Button>
               <div className="flex justify-center">
                 <Button variant="destructive" onClick={() => setConfirmRemove("webhook")} disabled={busy || locked}>
-                  Remove webhook
+                  Turn off phone alerts
                 </Button>
               </div>
             </div>
           </>
         ) : (
           <>
-            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Webhook URL (Discord, Slack, ntfy…)" spellCheck={false} autoCapitalize="none" className="field" />
-            <Button
-              className="mt-3"
-              disabled={busy || !url.trim()}
-              onClick={() =>
-                run({ cmd: "set_accountability", webhook: url.trim(), password: "" }, "Connected. Sent them a hello — ask them to confirm.").then(() => setUrl(""))
-              }
-            >
-              Connect webhook
+            <p className="t-body text-text-2">
+              One tap makes a private alert channel. Your partner just installs the free ntfy app and
+              scans a code — no account, nothing for you to type.
+            </p>
+            <Button className="mt-3" onClick={setupNtfy} disabled={busy || customWebhookOn}>
+              Set up phone alerts
             </Button>
+            {customWebhookOn && (
+              <GroupFootnote>A custom webhook is set (under Advanced). Remove it first to switch to phone alerts.</GroupFootnote>
+            )}
           </>
         )}
-        <GroupFootnote>
-          Make an Incoming Webhook in Discord/Slack, or use an ntfy.sh topic, and
-          paste its URL. The signal goes straight to them; Sanctum keeps no copy.
-        </GroupFootnote>
       </div>
 
-      {anyOn && (
-        <div className="mt-8">
-          <Button variant="secondary" onClick={() => run({ cmd: "test_accountability" }, "Test sent — ask them to confirm it arrived.")} disabled={busy}>
-            Send a test to your partner
-          </Button>
-          {hasPassword ? (
-            <GroupFootnote>Changing or removing a channel needs your password and alerts your partner first.</GroupFootnote>
-          ) : (
-            <GroupFootnote>Set a password on the Protection screen so a channel can't be removed on a whim.</GroupFootnote>
-          )}
-        </div>
-      )}
+      {/* Advanced: custom webhook + Twilio SMS. */}
+      <div className="mt-8">
+        <button
+          onClick={() => setAdvanced((v) => !v)}
+          className="pressable t-label mb-1 flex w-full items-center justify-between px-1"
+        >
+          <span>Advanced channels</span>
+          <span className="text-text-3">{advanced ? "Hide" : "Show"}</span>
+        </button>
 
-      {/* Password needed for change/remove when one is set. */}
+        {advanced && (
+          <div className="mt-2">
+            {/* Custom webhook (Discord / Slack / any HTTPS). */}
+            <GroupLabel>Chat app or custom webhook</GroupLabel>
+            {customWebhookOn ? (
+              <div className="flex justify-center">
+                <Button variant="destructive" onClick={() => setConfirmRemove("webhook")} disabled={busy || locked}>
+                  Remove webhook
+                </Button>
+              </div>
+            ) : (
+              <>
+                <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Webhook URL (Discord, Slack…)" spellCheck={false} autoCapitalize="none" className="field" />
+                <Button
+                  className="mt-3"
+                  disabled={busy || !url.trim() || ntfyTopic !== null}
+                  onClick={() => run({ cmd: "set_accountability", webhook: url.trim(), password }, "Webhook connected.").then(() => setUrl(""))}
+                >
+                  Connect webhook
+                </Button>
+                {ntfyTopic && <GroupFootnote>Phone alerts are on. Turn them off first to use a custom webhook instead.</GroupFootnote>}
+              </>
+            )}
+
+            {/* Twilio SMS. */}
+            <div className="mt-6">
+              <GroupLabel>Text message (your Twilio)</GroupLabel>
+              {smsOn ? (
+                <div className="flex justify-center">
+                  <Button variant="destructive" onClick={() => setConfirmRemove("sms")} disabled={busy || locked}>
+                    Remove SMS
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <input value={sid} onChange={(e) => setSid(e.target.value)} placeholder="Twilio Account SID (AC…)" spellCheck={false} autoCapitalize="none" className="field" />
+                  <input value={token} onChange={(e) => setToken(e.target.value)} type="password" placeholder="Twilio Auth Token" className="field mt-3" />
+                  <input value={from} onChange={(e) => setFrom(e.target.value)} placeholder="Your Twilio number (+1…)" className="field mt-3" />
+                  <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="Partner's phone (+1…)" className="field mt-3" />
+                  <Button
+                    className="mt-3"
+                    disabled={busy || !smsComplete}
+                    onClick={() =>
+                      run({ cmd: "set_accountability_sms", sid: sid.trim(), token: token.trim(), from: from.trim(), to: to.trim(), password: "" }, "SMS connected. Sent a hello text.").then(() => {
+                        setSid(""); setToken(""); setFrom(""); setTo("");
+                      })
+                    }
+                  >
+                    Connect SMS
+                  </Button>
+                  <GroupFootnote>Needs your own Twilio account (~1¢/text). Auth token stored only on this PC.</GroupFootnote>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Password for change/remove when one is set. */}
       {anyOn && hasPassword && (
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Your password (to change or remove)"
-          className="field mt-4"
+          className="field mt-6"
         />
+      )}
+      {anyOn && !hasPassword && (
+        <GroupFootnote>Set a password on the Protection screen so a channel can't be removed on a whim.</GroupFootnote>
       )}
 
       {note && <p className="t-caption mt-6 text-center">{note}</p>}
 
       <ConfirmModal
         open={confirmRemove !== null}
-        title={confirmRemove === "sms" ? "Remove SMS partner?" : "Remove webhook partner?"}
-        body="Your partner will be told this accountability channel was removed, and it will stop sending. You can set one up again anytime."
-        confirmLabel="Remove"
+        title={confirmRemove === "sms" ? "Remove SMS partner?" : "Turn off phone alerts?"}
+        body="Your partner will be told this channel was removed, and it will stop sending. You can set one up again anytime."
+        confirmLabel="Turn off"
         onConfirm={() => {
           const which = confirmRemove;
           setConfirmRemove(null);
           if (which === "sms") {
-            run({ cmd: "set_accountability_sms", sid: "", token: "", from: "", to: "", password }, "SMS removed. Your partner was texted that it was removed.").then(() => setPassword(""));
+            run({ cmd: "set_accountability_sms", sid: "", token: "", from: "", to: "", password }, "SMS removed. Your partner was told.").then(() => setPassword(""));
           } else {
-            run({ cmd: "set_accountability", webhook: "", password }, "Webhook removed. They were told it was removed.").then(() => setPassword(""));
+            run({ cmd: "set_accountability", webhook: "", password }, "Phone alerts off. Your partner was told.").then(() => setPassword(""));
           }
         }}
         onCancel={() => setConfirmRemove(null)}
