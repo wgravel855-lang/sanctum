@@ -224,6 +224,12 @@
       .nav-links a.link:hover {
         color: var(--text);
       }
+      /* the nav CTA sits quieter than the hero one */
+      .nav-links .btn {
+        padding: 9px 18px;
+        min-height: 38px;
+        font-size: 14.5px;
+      }
       .nav-toggle {
         display: none;
         background: none;
@@ -259,14 +265,15 @@
       }
       .hero-grid {
         display: grid;
-        grid-template-columns: 1.05fr 0.95fr;
+        grid-template-columns: 1.12fr 0.88fr;
         gap: 64px;
         align-items: center;
         padding: 128px 0 120px;
       }
       .hero h1 {
-        font-size: clamp(3.1rem, 6.2vw, 5rem);
+        font-size: clamp(3.1rem, 5.4vw, 4.1rem);
         margin-top: 28px;
+        text-wrap: balance;
       }
       .hero .sub {
         margin-top: 28px;
@@ -281,13 +288,6 @@
         gap: 14px;
         margin-top: 34px;
       }
-      .hero .fineprint {
-        margin-top: 18px;
-        font-family: var(--font-mono);
-        font-size: 13px;
-        letter-spacing: 0.01em;
-        color: var(--muted);
-      }
       /* figure/terminal captions in the mono annotation layer */
       .figcap {
         font-family: var(--font-mono);
@@ -300,24 +300,60 @@
         margin-top: 0;
       }
 
-      /* app card (the real product surface, in miniature) */
+      /* app window (the real product surface, in miniature) */
       .appcard {
         background: var(--surface);
         border: 1px solid var(--line);
-        border-radius: 22px;
-        padding: 40px 28px 30px;
-        text-align: center;
+        border-radius: 14px;
+        overflow: hidden;
         box-shadow:
-          0 40px 90px -40px rgba(0, 0, 0, 0.85),
-          0 0 70px -34px rgba(143, 188, 165, 0.16),
-          inset 0 1px 0 rgba(255, 255, 255, 0.05);
+          0 34px 80px -36px rgba(0, 0, 0, 0.85),
+          0 0 50px -30px rgba(143, 188, 165, 0.12),
+          inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      }
+      /* window title bar */
+      .tbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 44px;
+        padding: 0 16px;
+        background: #0e100f;
+        border-bottom: 1px solid var(--line);
+      }
+      .tbar-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 550;
+        color: var(--muted);
+      }
+      .tbar-brand svg {
+        width: 14px;
+        height: 14px;
+        color: var(--accent);
+      }
+      .tbar-ctl {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        color: var(--faint);
+      }
+      .tbar-ctl svg {
+        width: 10px;
+        height: 10px;
+      }
+      .abody {
+        padding: 30px 24px 22px;
+        text-align: center;
       }
       .ring {
-        width: 116px;
-        height: 116px;
+        width: 96px;
+        height: 96px;
         margin: 0 auto;
         border-radius: 50%;
-        border: 3px solid var(--accent);
+        border: 2.5px solid var(--accent);
         display: grid;
         place-items: center;
         color: var(--accent);
@@ -336,7 +372,7 @@
             inset 0 0 30px -18px rgba(143, 188, 165, 0.36);
         }
         50% {
-          transform: scale(1.045);
+          transform: scale(1.03);
           box-shadow:
             0 0 62px -10px rgba(143, 188, 165, 0.5),
             inset 0 0 26px -14px rgba(143, 188, 165, 0.55);
@@ -348,47 +384,67 @@
         }
       }
       .ring svg {
-        width: 52px;
-        height: 52px;
+        width: 42px;
+        height: 42px;
       }
       .appcard h3 {
-        font-size: 27px;
-        margin-top: 22px;
+        font-size: 21px;
+        margin-top: 18px;
       }
       .appcard .count {
-        margin-top: 8px;
+        margin-top: 6px;
         color: var(--muted);
-        font-size: 16.5px;
+        font-size: 15px;
       }
       .appcard .status {
-        margin-top: 4px;
+        margin-top: 3px;
         color: var(--faint);
-        font-size: 14px;
+        font-size: 13.5px;
       }
-      .chips {
+      /* status quadrants: hairline rows, no boxes, like the app's list */
+      .stats {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 10px;
+        column-gap: 28px;
         margin-top: 26px;
-      }
-      .chip {
-        background: var(--surface-2);
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 12px;
         text-align: left;
-        font-size: 14px;
       }
-      .chip span {
+      .stat {
+        border-top: 1px solid var(--hair);
+        padding: 12px 0 6px;
+      }
+      .stat .k {
         display: block;
+        font-size: 13px;
         color: var(--faint);
-        font-size: 12.5px;
-        margin-top: 2px;
       }
-      .chip svg {
-        width: 17px;
-        height: 17px;
-        color: var(--accent);
+      .stat .v {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 4px;
+        font-size: 15px;
+        font-weight: 550;
+        color: var(--text);
+      }
+      /* miniature of the app's real switch */
+      .tgl {
+        position: relative;
+        width: 30px;
+        height: 18px;
+        border-radius: 999px;
+        background: var(--accent);
+        flex: none;
+      }
+      .tgl::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--ink);
       }
 
       /* ---- section shell ---- */
@@ -722,39 +778,54 @@
             <a class="btn btn-primary" href="https://github.com/wgravel855-lang/sanctum/releases/latest/download/Sanctum-Windows-Setup.exe" download>Get Sanctum for Windows</a>
             <a class="btn btn-ghost" href="https://github.com/wgravel855-lang/sanctum">Read the source →</a>
           </div>
-          <p class="fineprint">Downloads the Windows installer. No account, no tracking, GPLv3.</p>
         </div>
 
         <!-- real product surface, in miniature -->
         <div class="hero-mock">
           <div class="appcard reveal" aria-hidden="true">
-          <div class="ring">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
-              <path d="M9 12l2 2 4-4" />
-            </svg>
-          </div>
-          <h3>Protection is active</h3>
-          <p class="count">14,382 harmful sites blocked</p>
-          <p class="status">All browsers protected</p>
-          <div class="chips">
-            <div class="chip">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg>
-              Protection<span>On</span>
+            <div class="tbar">
+              <span class="tbar-brand">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
+                  <path d="M9 12l2 2 4-4" />
+                </svg>
+                Sanctum
+              </span>
+              <span class="tbar-ctl">
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2 6h8" /></svg>
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.5" y="2.5" width="7" height="7" /></svg>
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" /></svg>
+              </span>
             </div>
-            <div class="chip">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-              Schedule<span>Always on</span>
+            <div class="abody">
+              <div class="ring">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
+                  <path d="M9 12l2 2 4-4" />
+                </svg>
+              </div>
+              <h3>Protection is active</h3>
+              <p class="count">14,382 harmful sites blocked</p>
+              <p class="status">All browsers protected</p>
+              <div class="stats">
+                <div class="stat">
+                  <span class="k">Protection</span>
+                  <span class="v"><span class="tgl"></span>On</span>
+                </div>
+                <div class="stat">
+                  <span class="k">Schedule</span>
+                  <span class="v">Always on</span>
+                </div>
+                <div class="stat">
+                  <span class="k">Block list</span>
+                  <span class="v">61,240 sites</span>
+                </div>
+                <div class="stat">
+                  <span class="k">Progress</span>
+                  <span class="v">12-day streak</span>
+                </div>
+              </div>
             </div>
-            <div class="chip">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>
-              Block list<span>61,240 sites</span>
-            </div>
-            <div class="chip">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
-              Progress<span>12-day streak</span>
-            </div>
-          </div>
           </div>
         </div>
       </div>
