@@ -42,11 +42,27 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" href="/fonts/jetbrains-mono-latin-500.woff2" as="font" type="font/woff2" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400..700&display=swap"
       rel="stylesheet"
     />
     <style>
+      /* self-hosted mono, used only for the small annotation layer */
+      @font-face {
+        font-family: "JetBrains Mono";
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url("/fonts/jetbrains-mono-latin-400.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "JetBrains Mono";
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: url("/fonts/jetbrains-mono-latin-500.woff2") format("woff2");
+      }
       :root {
         --bg: #0c0e0d;
         --bg-2: #101312;
@@ -65,6 +81,8 @@
         --maxw: 1024px;
         --font-display: "Inter Tight", -apple-system, "Segoe UI", system-ui, sans-serif;
         --font-sans: "Inter Tight", -apple-system, "Segoe UI", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+        --hair: rgba(255, 255, 255, 0.08);
       }
 
       * {
@@ -111,11 +129,18 @@
         padding-inline: 24px;
       }
       .eyebrow {
-        font-size: 12.5px;
-        font-weight: 600;
-        letter-spacing: 0.14em;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--accent);
+      }
+      /* full-width hairline that opens a numbered section, sitting just above
+         its eyebrow. Applied per-section so the nav/hero/footer keep no rule. */
+      .wrap.ruled {
+        border-top: 1px solid var(--hair);
+        padding-top: 30px;
       }
       .muted {
         color: var(--muted);
@@ -210,12 +235,23 @@
 
       /* ---- hero ---- */
       .hero {
+        overflow: hidden; /* clips the mockup bleed so the page never scrolls sideways */
         background:
           radial-gradient(
             120% 90% at 88% -10%,
             var(--bg-2) 0%,
             var(--bg) 55%
           );
+      }
+      .hero-mock {
+        min-width: 0;
+      }
+      /* asymmetry: on desktop the product mockup drifts right and crops a
+         sliver (~5%) off the viewport edge. Returns to center below 1024px. */
+      @media (min-width: 1024px) {
+        .hero-mock {
+          transform: translateX(calc((100vw - var(--maxw)) / 2 + 31px));
+        }
       }
       .hero-grid {
         display: grid;
@@ -243,8 +279,21 @@
       }
       .hero .fineprint {
         margin-top: 18px;
-        font-size: 13.5px;
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+        letter-spacing: 0.01em;
         color: var(--faint);
+      }
+      /* figure/terminal captions in the mono annotation layer */
+      .figcap {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        color: var(--faint);
+        margin: 32px 0 12px;
+      }
+      .lock-col .figcap {
+        margin-top: 0;
       }
 
       /* app card (the real product surface, in miniature) */
@@ -352,7 +401,7 @@
         font-size: clamp(2.3rem, 4.3vw, 3.3rem);
         margin-top: 20px;
       }
-      .section-head p {
+      .section-head p:not(.eyebrow) {
         margin-top: 24px;
         color: var(--muted);
         font-size: 19.5px;
@@ -382,44 +431,25 @@
         gap: 20px;
         margin-top: 56px;
       }
+      /* spec entries: same grid, no icon-cards. A hairline, a mono label,
+         then the description as plain body text. */
       .feature {
-        background: var(--surface);
-        border: 1px solid transparent;
-        border-radius: 20px;
-        padding: 34px 32px;
-        transition:
-          background-color 0.16s,
-          transform 0.16s;
+        border-top: 1px solid var(--hair);
+        padding: 20px 0 0;
       }
-      .feature:hover {
-        background: var(--surface-2);
-        transform: translateY(-2px);
-      }
-      .feature .ic {
-        width: 40px;
-        height: 40px;
-        border-radius: 11px;
-        background: color-mix(in srgb, var(--accent) 16%, transparent);
+      .feature .label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
         color: var(--accent);
-        display: grid;
-        place-items: center;
-      }
-      .feature .ic svg {
-        width: 21px;
-        height: 21px;
-      }
-      .feature h3 {
-        font-family: var(--font-sans);
-        font-weight: 600;
-        font-size: 19.5px;
-        margin-top: 20px;
-        letter-spacing: 0;
       }
       .feature p {
-        margin-top: 11px;
-        color: var(--muted);
+        margin-top: 14px;
+        color: color-mix(in srgb, var(--text) 68%, transparent);
         font-size: 16.5px;
-        line-height: 1.55;
+        line-height: 1.6;
       }
 
       /* honest lock: two column */
@@ -453,13 +483,13 @@
 
       /* privacy: code */
       .code {
-        margin-top: 32px;
+        margin-top: 0;
         background: #090b0a;
         border: 1px solid var(--line);
         border-radius: 12px;
         padding: 22px 24px;
-        font-family: "SF Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
-        font-size: 13.5px;
+        font-family: var(--font-mono);
+        font-size: 13px;
         line-height: 1.9;
         overflow-x: auto;
         color: var(--muted);
@@ -486,8 +516,11 @@
         padding-top: 20px;
       }
       .step .n {
-        font-family: var(--font-display);
-        font-size: 15px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
         color: var(--accent);
       }
       .step h3 {
@@ -505,7 +538,7 @@
       .step code {
         display: inline-block;
         margin-top: 10px;
-        font-family: ui-monospace, Consolas, monospace;
+        font-family: var(--font-mono);
         font-size: 12.5px;
         color: var(--accent-bright);
         background: #090b0a;
@@ -522,7 +555,7 @@
       .final h2 {
         font-size: clamp(2rem, 4vw, 2.8rem);
       }
-      .final p {
+      .final p:not(.eyebrow) {
         margin: 16px auto 0;
         max-width: 46ch;
         color: var(--muted);
@@ -589,10 +622,12 @@
           gap: 44px;
           padding: 80px 0 72px;
         }
+        .hero-mock {
+          order: 2;
+        }
         .hero .appcard {
           max-width: 420px;
           margin-inline: auto;
-          order: 2;
         }
         .split {
           grid-template-columns: 1fr;
@@ -686,7 +721,8 @@
         </div>
 
         <!-- real product surface, in miniature -->
-        <div class="appcard reveal" aria-hidden="true">
+        <div class="hero-mock">
+          <div class="appcard reveal" aria-hidden="true">
           <div class="ring">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
@@ -714,15 +750,16 @@
               Progress<span>12-day streak</span>
             </div>
           </div>
+          </div>
         </div>
       </div>
     </section>
 
     <!-- PROBLEM -->
     <section>
-      <div class="wrap">
+      <div class="wrap ruled">
         <div class="section-head reveal">
-          <p class="eyebrow">Why willpower keeps losing</p>
+          <p class="eyebrow">01 · Why willpower keeps losing</p>
           <h2>You're not weak. The feed is built to win.</h2>
           <p>
             Endless content is one tab away, engineered to be frictionless and hard
@@ -739,9 +776,9 @@
 
     <!-- HOW IT WORKS -->
     <section id="how" class="band">
-      <div class="wrap">
+      <div class="wrap ruled">
         <div class="section-head reveal">
-          <p class="eyebrow">How it works</p>
+          <p class="eyebrow">02 · How it works</p>
           <h2>Filtering below the browser.</h2>
           <p>
             No extension to uninstall, no per-browser setup. Sanctum works at the DNS
@@ -751,23 +788,19 @@
         </div>
         <div class="feature-grid">
           <div class="feature reveal">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
-            <h3>Every browser, no extension</h3>
+            <div class="label">COVERAGE</div>
             <p>Chrome, Edge, and Firefox are all covered, Incognito and Private windows included, because filtering happens below them.</p>
           </div>
           <div class="feature reveal">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>
-            <h3>SafeSearch, forced</h3>
+            <div class="label">SAFESEARCH</div>
             <p>Google, Bing, and DuckDuckGo are locked to SafeSearch; YouTube runs in Restricted Mode.</p>
           </div>
           <div class="feature reveal">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg></div>
-            <h3>Keeps working</h3>
+            <div class="label">PERSISTENCE</div>
             <p>A background Windows service and a companion watchdog keep filtering on. Close the app or kill the process, and it comes right back.</p>
           </div>
           <div class="feature reveal">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0116 0M4 12a8 8 0 0016 0M12 4v16"/></svg></div>
-            <h3>DoH-aware</h3>
+            <div class="label">DOH</div>
             <p>It contains the DNS-over-HTTPS trick that quietly defeats most blockers, so encrypted lookups fall back to something Sanctum can filter.</p>
           </div>
         </div>
@@ -780,9 +813,9 @@
 
     <!-- HONEST LOCK -->
     <section id="lock">
-      <div class="wrap split">
+      <div class="wrap split ruled">
         <div class="section-head reveal" style="max-width: none">
-          <p class="eyebrow">Locked sessions</p>
+          <p class="eyebrow">03 · Locked sessions</p>
           <h2>We tell you the truth about removing it.</h2>
           <p>
             Start a locked session and the settings freeze: the block list can only
@@ -795,7 +828,9 @@
             craving, not enough to trap you on your own machine.
           </p>
         </div>
-        <div class="lockcard reveal">
+        <div class="lock-col reveal">
+        <p class="figcap">fig. 02 · the lock screen, verbatim</p>
+        <div class="lockcard">
           <span class="pill">Locked · 3 days left</span>
           <p class="copy">
             “Locked until Monday, 6:00 AM. This can't be turned off early from inside
@@ -804,14 +839,15 @@
             impossible.”
           </p>
         </div>
+        </div>
       </div>
     </section>
 
     <!-- PRIVACY -->
     <section id="privacy" class="band">
-      <div class="wrap">
+      <div class="wrap ruled">
         <div class="section-head reveal">
-          <p class="eyebrow">Privacy</p>
+          <p class="eyebrow">04 · Privacy</p>
           <h2>Nothing leaves your machine. Prove it.</h2>
           <p>
             No accounts, no servers, no analytics, no telemetry. Your block list,
@@ -819,6 +855,7 @@
             don't have to take our word for it:
           </p>
         </div>
+        <p class="figcap reveal">fig. 01 · run it yourself</p>
         <div class="code reveal">
           <div><span class="c"># any analytics or telemetry SDK?</span></div>
           <div><span class="p">&gt; findstr /S /I /M "analytics telemetry sentry mixpanel" *.rs *.ts</span></div>
@@ -831,9 +868,9 @@
 
     <!-- SUSTAINABILITY -->
     <section>
-      <div class="wrap">
+      <div class="wrap ruled">
         <div class="section-head reveal">
-          <p class="eyebrow">Free &amp; sustainable</p>
+          <p class="eyebrow">05 · Free &amp; sustainable</p>
           <h2>Free forever. Paywalling protection would be wrong.</h2>
           <p>
             Sanctum is released under the GPLv3. Copyleft is a deliberate choice for a
@@ -846,9 +883,9 @@
 
     <!-- GET STARTED -->
     <section id="get" class="band">
-      <div class="wrap">
+      <div class="wrap ruled">
         <div class="section-head reveal">
-          <p class="eyebrow">Get started</p>
+          <p class="eyebrow">06 · Get started</p>
           <h2>Three steps.</h2>
         </div>
         <div class="steps">
@@ -875,8 +912,8 @@
 
     <!-- FINAL CTA -->
     <section class="final">
-      <div class="wrap">
-        <p class="eyebrow reveal">Make the decision once</p>
+      <div class="wrap ruled">
+        <p class="eyebrow reveal">07 · Make the decision once</p>
         <h2 class="reveal" style="margin-top: 14px">Bind your future self, honestly.</h2>
         <p class="reveal">
           Set the block today, while your head is clear. Let Sanctum hold the line
@@ -898,7 +935,7 @@
             <path d="M9 12l2 2 4-4" />
           </svg>
           Sanctum
-          <span class="tag" style="margin-left: 10px; font-family: var(--font-sans); font-weight: 400">friction, not stealth</span>
+          <span class="tag" style="margin-left: 10px; font-family: var(--font-mono); font-weight: 400; font-size: 12.5px; letter-spacing: 0.02em">friction, not stealth</span>
         </div>
         <div class="foot-links">
           <a href="#how">How it works</a>
