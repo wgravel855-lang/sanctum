@@ -61,14 +61,30 @@
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
-  ; Ask the service to tear itself down. It refuses (non-zero) only while a lock
-  ; is active — in which case we honestly block the uninstall and point at the
-  ; Safe-Mode escape, exactly like the in-app copy promises.
+  ; Ask the service to tear itself down. Exit code reports the reason:
+  ;   0 = removed, 2 = locked session, 3 = uninstall cooldown just armed,
+  ;   4 = cooldown still counting down, other = error.
   DetailPrint "Removing Sanctum protection..."
-  nsExec::ExecToLog '"$INSTDIR\sanctum-service.exe" uninstall'
+  ; A SILENT uninstall means an upgrade/scripted run (Tauri runs the old
+  ; version's uninstaller with /S when installing a newer one). Skip the opt-in
+  ; cooldown there so upgrades are never blocked; an interactive uninstall (the
+  ; user clicked Uninstall) still honors it.
+  StrCpy $3 ""
+  IfSilent 0 +2
+    StrCpy $3 " --no-cooldown"
+  nsExec::ExecToLog '"$INSTDIR\sanctum-service.exe" uninstall$3'
   Pop $0
   StrCmp $0 "0" sanctum_uninstall_ok
-    MessageBox MB_OK|MB_ICONSTOP "A locked Sanctum session is still active, so Sanctum can't be uninstalled yet.$\n$\nWait for the timer to end, or reboot Windows into Safe Mode and run sanctum-recover.exe to remove it. That friction is the point."
+  StrCmp $0 "3" sanctum_cd_armed
+  StrCmp $0 "4" sanctum_cd_wait
+  ; Default (locked session, code 2, or any other refusal).
+  MessageBox MB_OK|MB_ICONSTOP "A locked Sanctum session is still active, so Sanctum can't be uninstalled yet.$\n$\nWait for the timer to end, or reboot Windows into Safe Mode and run sanctum-recover.exe to remove it. That friction is the point."
+  Abort
+  sanctum_cd_armed:
+    MessageBox MB_OK|MB_ICONINFORMATION "You set an uninstall cooldown, so Sanctum can't be removed right away.$\n$\nThe cooldown just started. Run this uninstaller again after it elapses to finish removing Sanctum.$\n$\n(To remove it right now, reboot into Safe Mode and run sanctum-recover.exe.)"
+    Abort
+  sanctum_cd_wait:
+    MessageBox MB_OK|MB_ICONINFORMATION "Your uninstall cooldown is still counting down.$\n$\nRun this uninstaller again once it finishes, or reboot into Safe Mode and run sanctum-recover.exe to remove it now."
     Abort
   sanctum_uninstall_ok:
 !macroend

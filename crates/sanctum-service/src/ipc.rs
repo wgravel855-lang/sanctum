@@ -304,6 +304,26 @@ impl IpcHandler {
                 Response::Ok
             }
 
+            Command::SetUninstallCooldown { hours } => {
+                // Grow-only: enabling/increasing only strengthens (no password);
+                // reducing or disabling once set is refused by the guard.
+                let mut cfg = db.load_config()?;
+                match config::guard_cooldown_change(cfg.uninstall_cooldown_hours, hours) {
+                    Ok(accepted) => {
+                        let was = cfg.uninstall_cooldown_hours;
+                        cfg.uninstall_cooldown_hours = accepted;
+                        db.save_config(&cfg)?;
+                        db.record_event(
+                            "uninstall_cooldown_set",
+                            &format!("{was}h -> {accepted}h"),
+                            now,
+                        )?;
+                        Response::Ok
+                    }
+                    Err(e) => denied(&e.to_string()),
+                }
+            }
+
             Command::ResolveIntervention => {
                 db.record_urge_resisted(now)?;
                 Response::Ok
@@ -349,6 +369,7 @@ impl IpcHandler {
             custom_block_count: db.list_custom_block()?.len(),
             block_bypass: cfg.block_bypass,
             block_strict: cfg.block_strict,
+            uninstall_cooldown_hours: cfg.uninstall_cooldown_hours,
             has_password: db.has_password()?,
             all_browsers: true,
         })

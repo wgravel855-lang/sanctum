@@ -20,7 +20,9 @@ fn main() -> anyhow::Result<()> {
     match cmd.as_str() {
         "run" => service::run(),
         "install" => service::install(),
-        "uninstall" => match service::uninstall()? {
+        "uninstall" => match service::uninstall(
+            std::env::args().any(|a| a == "--no-cooldown"),
+        )? {
             service::UninstallOutcome::Removed => Ok(()),
             service::UninstallOutcome::Refused { code, message } => {
                 // Authoritative, user-facing reason on stdout; the NSIS

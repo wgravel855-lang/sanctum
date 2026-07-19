@@ -556,13 +556,49 @@ pub enum UninstallOutcome {
     Refused { code: i32, message: String },
 }
 
-/// Tear down and remove the services. Refused only while a lock is active (the
-/// Safe-Mode escape is the documented way out); otherwise removal is immediate.
-pub fn uninstall() -> anyhow::Result<UninstallOutcome> {
+const UNINSTALL_ARM_KV: &str = "uninstall_requested_at";
+/// Window to actually complete the uninstall after the cooldown elapses, before
+/// the request goes stale and must be re-armed (so a months-old arm can't grant
+/// an instant removal later).
+const UNINSTALL_GRACE_HOURS: i64 = 72;
+
+/// Pure decision for the (opt-in) uninstall cooldown. Extracted so the rules are
+/// unit-tested without touching the SCM or a real clock.
+#[derive(Debug, PartialEq, Eq)]
+enum CooldownDecision {
+    /// Cooldown satisfied within the completion window — remove now.
+    Proceed,
+    /// Not armed, or the arm went stale — (re)arm and refuse.
+    Arm,
+    /// Still counting down; `left_h` hours remain.
+    Waiting { left_h: i64 },
+}
+
+fn cooldown_decision(armed: Option<i64>, now: i64, cooldown_s: i64, grace_s: i64) -> CooldownDecision {
+    match armed {
+        Some(t) if now - t >= 0 && now - t < cooldown_s => {
+            let left_h = ((cooldown_s - (now - t)) as f64 / 3600.0).ceil() as i64;
+            CooldownDecision::Waiting { left_h }
+        }
+        Some(t) if now - t >= cooldown_s && now - t <= cooldown_s + grace_s => {
+            CooldownDecision::Proceed
+        }
+        _ => CooldownDecision::Arm,
+    }
+}
+
+/// Tear down and remove the services. `skip_cooldown` bypasses the opt-in
+/// uninstall cooldown — the installer passes it when the uninstaller runs
+/// SILENTLY (how a version UPGRADE runs the old uninstaller), so upgrades are
+/// never blocked. Refused while a lock is active (Safe Mode is the escape), and,
+/// if the user opted into an uninstall cooldown, until that cooldown elapses.
+pub fn uninstall(skip_cooldown: bool) -> anyhow::Result<UninstallOutcome> {
     use windows_service::service::ServiceAccess;
     use windows_service::service_manager::ServiceManagerAccess;
 
-    if is_locked() && !in_safe_mode() {
+    let safe = in_safe_mode();
+
+    if is_locked() && !safe {
         return Ok(UninstallOutcome::Refused {
             code: 2,
             message: "A locked Sanctum session is active. It can't be uninstalled until the \
@@ -570,6 +606,52 @@ pub fn uninstall() -> anyhow::Result<UninstallOutcome> {
                       friction is the point."
                 .into(),
         });
+    }
+
+    // Opt-in uninstall cooldown (0 = off). Safe Mode and silent upgrades bypass.
+    if !safe && !skip_cooldown {
+        if let Ok(db) = Db::open(paths::db_path()) {
+            let cooldown_h = db
+                .load_config()
+                .map(|c| c.uninstall_cooldown_hours as i64)
+                .unwrap_or(0);
+            if cooldown_h > 0 {
+                let now = chrono::Utc::now().timestamp();
+                let cooldown_s = cooldown_h * 3600;
+                let grace_s = UNINSTALL_GRACE_HOURS * 3600;
+                let armed = db
+                    .get_kv(UNINSTALL_ARM_KV)
+                    .ok()
+                    .flatten()
+                    .and_then(|s| s.parse::<i64>().ok());
+                match cooldown_decision(armed, now, cooldown_s, grace_s) {
+                    CooldownDecision::Waiting { left_h } => {
+                        return Ok(UninstallOutcome::Refused {
+                            code: 4,
+                            message: format!(
+                                "Your uninstall cooldown is still counting down (about {left_h} h \
+                                 left). Run the uninstaller again after it ends, or reboot into Safe \
+                                 Mode and run sanctum-recover.exe to remove it now."
+                            ),
+                        });
+                    }
+                    CooldownDecision::Proceed => {
+                        let _ = db.set_kv(UNINSTALL_ARM_KV, "");
+                    }
+                    CooldownDecision::Arm => {
+                        let _ = db.set_kv(UNINSTALL_ARM_KV, &now.to_string());
+                        return Ok(UninstallOutcome::Refused {
+                            code: 3,
+                            message: format!(
+                                "You set a {cooldown_h}-hour uninstall cooldown. It's now armed — \
+                                 run the uninstaller again after about {cooldown_h} hours to finish. \
+                                 (Reboot into Safe Mode + sanctum-recover.exe removes it immediately.)"
+                            ),
+                        });
+                    }
+                }
+            }
+        }
     }
 
     // Take enforcement down cleanly before removing the services.
@@ -594,4 +676,24 @@ pub fn uninstall() -> anyhow::Result<UninstallOutcome> {
     }
     tracing::info!("uninstalled Sanctum services");
     Ok(UninstallOutcome::Removed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{cooldown_decision, CooldownDecision};
+    const H: i64 = 3600;
+
+    #[test]
+    fn cooldown_arms_waits_and_proceeds() {
+        let now = 1_000_000;
+        assert_eq!(cooldown_decision(None, now, 24 * H, 72 * H), CooldownDecision::Arm);
+        assert_eq!(
+            cooldown_decision(Some(now - 1 * H), now, 24 * H, 72 * H),
+            CooldownDecision::Waiting { left_h: 23 }
+        );
+        assert_eq!(cooldown_decision(Some(now - 24 * H), now, 24 * H, 72 * H), CooldownDecision::Proceed);
+        // Stale (past grace) and future (clock skew) both re-arm.
+        assert_eq!(cooldown_decision(Some(now - 200 * H), now, 24 * H, 72 * H), CooldownDecision::Arm);
+        assert_eq!(cooldown_decision(Some(now + 5 * H), now, 24 * H, 72 * H), CooldownDecision::Arm);
+    }
 }

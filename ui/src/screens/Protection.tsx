@@ -26,6 +26,20 @@ const COLD_COPY = {
   body: "For the length of time you pick, every setting is frozen. You can add sites to the block list but cannot remove any, protection cannot be turned off, and your password will not unlock it.\n\nThe only early way out is restarting Windows in Safe Mode, so this is meant to outlast a craving rather than trap you.",
 };
 
+const COOLDOWN_OPTIONS = [
+  { label: "12 hours", h: 12 },
+  { label: "24 hours", h: 24 },
+  { label: "2 days", h: 48 },
+  { label: "1 week", h: 168 },
+];
+function cooldownLabel(h: number): string {
+  if (h <= 0) return "Off";
+  if (h < 24) return `${h}h`;
+  if (h % 168 === 0) return `${h / 168}w`;
+  if (h % 24 === 0) return `${h / 24}d`;
+  return `${h}h`;
+}
+
 export default function Protection({
   status,
   onBack,
@@ -50,9 +64,12 @@ export default function Protection({
   const [strictPrompt, setStrictPrompt] = useState(false);
   const [strictPw, setStrictPw] = useState("");
   const [modal, setModal] = useState<null | "strict" | "cold">(null);
+  const [cooldownPicker, setCooldownPicker] = useState(false);
+  const [pendingCooldown, setPendingCooldown] = useState<number | null>(null);
 
   const bypassOn = status?.block_bypass ?? true;
   const strictOn = status?.block_strict ?? false;
+  const cooldownHours = status?.uninstall_cooldown_hours ?? 0;
 
   const handle = async (r: Response, okMsg?: string) => {
     if (r.resp === "ok") setNote(okMsg ?? null);
@@ -137,6 +154,15 @@ export default function Protection({
     setNote(null);
     if (next) setModal("cold"); // confirm before arming
     else setArmCT(false);
+  };
+
+  const setCooldown = async (hours: number) => {
+    setBusy(true);
+    await handle(
+      await sendCommand({ cmd: "set_uninstall_cooldown", hours }),
+      "Uninstall cooldown set.",
+    );
+    setBusy(false);
   };
 
   const startLock = async (minutes: number) => {
@@ -338,6 +364,49 @@ export default function Protection({
         )}
       </div>
 
+      {/* Opt-in uninstall cooldown — binding once set (grow-only). */}
+      <div className="mt-8">
+        <Group>
+          <Row onClick={() => setCooldownPicker((v) => !v)}>
+            <span className="flex flex-col">
+              <span className="t-row-title">Uninstall cooldown</span>
+              <span className="t-caption">
+                {cooldownHours > 0 ? "Set · can only be increased" : "Off"}
+              </span>
+            </span>
+            <span className="row-trailing t-subtitle">{cooldownLabel(cooldownHours)} ›</span>
+          </Row>
+        </Group>
+
+        {cooldownPicker && (
+          <div className="mt-3">
+            <p className="t-caption mb-3 px-1">
+              Make uninstalling Sanctum wait a set time.{" "}
+              <span className="text-text-1">
+                Once you set it you can't reduce or remove it, only increase it.
+              </span>{" "}
+              Rebooting into Safe Mode always removes Sanctum right away.
+            </p>
+            {COOLDOWN_OPTIONS.filter((o) => o.h > cooldownHours).length > 0 ? (
+              <div className="grid grid-cols-2 gap-2">
+                {COOLDOWN_OPTIONS.filter((o) => o.h > cooldownHours).map((o) => (
+                  <button
+                    key={o.h}
+                    disabled={busy}
+                    onClick={() => setPendingCooldown(o.h)}
+                    className="pressable rounded-[10px] border border-hairline py-3 text-[15px] text-text-1 disabled:opacity-50"
+                  >
+                    Set {o.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="t-caption px-1">This is already the maximum.</p>
+            )}
+          </div>
+        )}
+      </div>
+
       {note && <p className="t-caption mt-4 text-center">{note}</p>}
 
       <SecuritySection status={status} refresh={refresh} />
@@ -363,6 +432,22 @@ export default function Protection({
           setArmCT(true);
         }}
         onCancel={() => setModal(null)}
+      />
+      <ConfirmModal
+        open={pendingCooldown !== null}
+        title="Set this uninstall cooldown?"
+        body={`Uninstalling Sanctum will then wait ${
+          COOLDOWN_OPTIONS.find((o) => o.h === pendingCooldown)?.label ??
+          `${pendingCooldown} hours`
+        } before it finishes. You won't be able to reduce or remove this cooldown afterward, only increase it. Rebooting into Safe Mode still removes Sanctum immediately.`}
+        confirmLabel="Set cooldown"
+        onConfirm={() => {
+          const h = pendingCooldown ?? 0;
+          setPendingCooldown(null);
+          setCooldownPicker(false);
+          setCooldown(h);
+        }}
+        onCancel={() => setPendingCooldown(null)}
       />
     </div>
   );

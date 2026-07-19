@@ -29,6 +29,7 @@ const mockStatus: Status = {
   custom_block_count: 2,
   block_bypass: true,
   block_strict: false,
+  uninstall_cooldown_hours: 0,
   has_password: false,
   all_browsers: true,
 };
@@ -124,6 +125,14 @@ async function mockCommand(cmd: Command): Promise<Response> {
       }
       mockStatus.block_strict = cmd.enabled;
       return { resp: "ok" };
+    case "set_uninstall_cooldown": {
+      const cur = mockStatus.uninstall_cooldown_hours;
+      const want = Math.min(cmd.hours, 720);
+      if (cur > 0 && want < cur)
+        return { resp: "denied", body: { reason: "The uninstall cooldown can only be increased, not reduced or turned off." } };
+      mockStatus.uninstall_cooldown_hours = want;
+      return { resp: "ok" };
+    }
     case "resolve_intervention":
       mockStatus.urges_resisted += 1;
       return { resp: "ok" };

@@ -28,6 +28,7 @@ export interface Status {
   custom_block_count: number;
   block_bypass: boolean;
   block_strict: boolean;
+  uninstall_cooldown_hours: number;
   has_password: boolean;
   all_browsers: boolean;
 }
@@ -55,6 +56,7 @@ export type Command =
   | { cmd: "enable_protection" }
   | { cmd: "set_bypass_blocking"; enabled: boolean; password: string }
   | { cmd: "set_strict_mode"; enabled: boolean; password: string }
+  | { cmd: "set_uninstall_cooldown"; hours: number }
   | { cmd: "delete_history" }
   | { cmd: "poll_intervention" }
   | { cmd: "trigger_intervention" }

@@ -118,6 +118,12 @@ pub struct AppConfig {
     /// filter can break the service's own forwarding). See README.
     #[serde(default)]
     pub block_plaintext_dns: bool,
+    /// Opt-in uninstall cooldown, in hours. 0 = off (the default). Once set
+    /// above zero it is GROW-ONLY (see `guard_cooldown_change`): it can be
+    /// increased but never reduced or turned off — a binding commitment. Safe
+    /// Mode is still the honest escape, exactly like a locked session.
+    #[serde(default)]
+    pub uninstall_cooldown_hours: u32,
 }
 
 fn default_true() -> bool {
@@ -138,8 +144,27 @@ impl Default for AppConfig {
             block_strict: false,
             block_doh_ips: true,
             block_plaintext_dns: false,
+            uninstall_cooldown_hours: 0,
         }
     }
+}
+
+/// Hard ceiling on the opt-in uninstall cooldown (30 days), so it can never be
+/// set to an effectively-permanent value.
+pub const MAX_UNINSTALL_COOLDOWN_HOURS: u32 = 720;
+
+/// Guard a change to the uninstall-cooldown setting. GROW-ONLY: once set above
+/// zero it can only be increased, never reduced or disabled. Enabling or
+/// increasing it only strengthens protection, so it needs no password. Returns
+/// the accepted value (clamped to the max).
+pub fn guard_cooldown_change(current_hours: u32, proposed_hours: u32) -> Result<u32> {
+    let proposed = proposed_hours.min(MAX_UNINSTALL_COOLDOWN_HOURS);
+    if current_hours > 0 && proposed < current_hours {
+        return Err(Error::Locked(
+            "The uninstall cooldown can only be increased, not reduced or turned off.".into(),
+        ));
+    }
+    Ok(proposed)
 }
 
 /// Lock ("Cold Turkey") state. A real lock always has an expiry — Sanctum
@@ -288,6 +313,22 @@ mod tests {
         // Exactly at the ceiling is allowed.
         let ok = LockState::locked_until(now + Duration::days(90));
         assert!(guard_lock_change(&cur, &ok, now).is_ok());
+    }
+
+    #[test]
+    fn cooldown_is_grow_only_and_clamped() {
+        // From off, any value can be set (and is clamped to the max).
+        assert_eq!(guard_cooldown_change(0, 24).unwrap(), 24);
+        assert_eq!(guard_cooldown_change(0, 0).unwrap(), 0);
+        assert_eq!(
+            guard_cooldown_change(0, 100_000).unwrap(),
+            MAX_UNINSTALL_COOLDOWN_HOURS
+        );
+        // Once set, it can be increased but never reduced or disabled.
+        assert_eq!(guard_cooldown_change(24, 48).unwrap(), 48);
+        assert!(guard_cooldown_change(24, 12).is_err());
+        assert!(guard_cooldown_change(24, 0).is_err());
+        assert_eq!(guard_cooldown_change(24, 24).unwrap(), 24);
     }
 
     #[test]

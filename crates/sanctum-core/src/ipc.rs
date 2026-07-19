@@ -54,6 +54,10 @@ pub enum Command {
     /// Enabling is always allowed; disabling is password-gated and frozen while
     /// locked.
     SetStrictMode { enabled: bool, password: String },
+    /// Set the opt-in uninstall cooldown, in hours (0 = off). GROW-ONLY: once
+    /// set above zero it can only be increased, never reduced or disabled. Only
+    /// ever strengthens, so no password is required.
+    SetUninstallCooldown { hours: u32 },
     /// Wipe the activity log immediately.
     DeleteHistory,
     /// Poll for a pending block-moment intervention (v0.1.5 §A). The UI calls
@@ -133,6 +137,9 @@ pub struct Status {
     /// Whether Strict mode (suggestive-content gateways) is on.
     #[serde(default)]
     pub block_strict: bool,
+    /// The opt-in uninstall cooldown in hours (0 = off). Grow-only once set.
+    #[serde(default)]
+    pub uninstall_cooldown_hours: u32,
     pub has_password: bool,
     /// The "All browsers protected" status line.
     pub all_browsers: bool,
