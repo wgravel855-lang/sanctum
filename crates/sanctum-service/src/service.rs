@@ -549,6 +549,29 @@ pub fn install() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Post an accountability signal to the user's webhook (if set), synchronously,
+/// so it lands before this short-lived process exits. Best-effort.
+fn notify_partner_blocking(text: &str) {
+    if let Ok(db) = Db::open(paths::db_path()) {
+        if let Ok(cfg) = db.load_config() {
+            let w = cfg.accountability_webhook.trim();
+            if !w.is_empty() {
+                let stamp = chrono::Local::now().format("%b %d, %I:%M %p");
+                crate::notifier::notify_blocking(w, &format!("Sanctum · {stamp}\n{text}"));
+            }
+            if cfg.sms_configured() {
+                crate::notifier::send_sms_blocking(
+                    &cfg.sms_account_sid,
+                    &cfg.sms_auth_token,
+                    &cfg.sms_from,
+                    &cfg.sms_to,
+                    &format!("Sanctum: {text}"),
+                );
+            }
+        }
+    }
+}
+
 /// The result of an uninstall attempt. The CLI maps this to an exit code +
 /// message; the NSIS uninstaller branches on the code to show the right reason.
 pub enum UninstallOutcome {
@@ -599,6 +622,7 @@ pub fn uninstall(skip_cooldown: bool) -> anyhow::Result<UninstallOutcome> {
     let safe = in_safe_mode();
 
     if is_locked() && !safe {
+        notify_partner_blocking("An uninstall was attempted while a locked session is active.");
         return Ok(UninstallOutcome::Refused {
             code: 2,
             message: "A locked Sanctum session is active. It can't be uninstalled until the \
@@ -640,6 +664,9 @@ pub fn uninstall(skip_cooldown: bool) -> anyhow::Result<UninstallOutcome> {
                     }
                     CooldownDecision::Arm => {
                         let _ = db.set_kv(UNINSTALL_ARM_KV, &now.to_string());
+                        notify_partner_blocking(
+                            "An uninstall of Sanctum was started; a cooldown is now counting down.",
+                        );
                         return Ok(UninstallOutcome::Refused {
                             code: 3,
                             message: format!(
@@ -653,6 +680,10 @@ pub fn uninstall(skip_cooldown: bool) -> anyhow::Result<UninstallOutcome> {
             }
         }
     }
+
+    // Past all gates: Sanctum is actually being removed. Tell the partner (this
+    // must be blocking — the process exits right after the teardown).
+    notify_partner_blocking("Sanctum is being uninstalled.");
 
     // Take enforcement down cleanly before removing the services.
     let engine = EnforcementEngine::new();

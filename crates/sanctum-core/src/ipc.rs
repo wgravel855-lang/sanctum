@@ -58,6 +58,22 @@ pub enum Command {
     /// set above zero it can only be increased, never reduced or disabled. Only
     /// ever strengthens, so no password is required.
     SetUninstallCooldown { hours: u32 },
+    /// Set/change/remove the accountability webhook (empty = remove). Adding one
+    /// (from none) is always allowed; changing or removing an existing one is
+    /// password-gated and frozen while locked, and alerts the current partner.
+    SetAccountability { webhook: String, password: String },
+    /// Set/change/remove Twilio SMS accountability (all-empty = remove). Same
+    /// gating as the webhook: adding is allowed; changing or removing an existing
+    /// one is password-gated, frozen while locked, and alerts the partner.
+    SetAccountabilitySms {
+        sid: String,
+        token: String,
+        from: String,
+        to: String,
+        password: String,
+    },
+    /// Send a test notification to every configured accountability channel.
+    TestAccountability,
     /// Wipe the activity log immediately.
     DeleteHistory,
     /// Poll for a pending block-moment intervention (v0.1.5 §A). The UI calls
@@ -140,6 +156,12 @@ pub struct Status {
     /// The opt-in uninstall cooldown in hours (0 = off). Grow-only once set.
     #[serde(default)]
     pub uninstall_cooldown_hours: u32,
+    /// Whether an accountability webhook is configured.
+    #[serde(default)]
+    pub accountability_on: bool,
+    /// Whether Twilio SMS accountability is configured.
+    #[serde(default)]
+    pub accountability_sms_on: bool,
     pub has_password: bool,
     /// The "All browsers protected" status line.
     pub all_browsers: bool,

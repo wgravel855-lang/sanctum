@@ -919,20 +919,23 @@
       <div class="wrap ruled">
         <div class="section-head reveal">
           <p class="eyebrow">04 · Privacy</p>
-          <h2>Nothing leaves your machine. Prove it.</h2>
+          <h2>Nothing is sent to us. Prove it.</h2>
           <p>
-            No accounts, no servers, no analytics, no telemetry. Your block list,
-            streak, and logs live only on your PC. Because Sanctum is open source, you
-            don't have to take our word for it:
+            No account, no server of our own, no analytics, no telemetry. Your block
+            list, streak, and logs live only on your PC. The one exception is
+            accountability, which is off unless you turn it on: then short
+            protection-state alerts go only to a channel you choose, never what you
+            browse. Because Sanctum is open source, you can check all of it:
           </p>
         </div>
         <p class="figcap reveal">fig. 01 · run it yourself</p>
         <div class="code reveal">
-          <div><span class="c"># any analytics or telemetry SDK?</span></div>
-          <div><span class="p">&gt; findstr /S /I /M "analytics telemetry sentry mixpanel" *.rs *.ts</span></div>
-          <div><span class="c"># any HTTP client that could phone home?</span></div>
-          <div><span class="p">&gt; findstr /S /I /M "reqwest hyper ureq isahc" Cargo.toml</span></div>
-          <div><span class="ok">→ no matches. The only network Sanctum makes is the DNS it filters.</span></div>
+          <div><span class="c"># analytics or telemetry SDKs phoning home to us?</span></div>
+          <div><span class="p">&gt; findstr /S /I /M "analytics telemetry sentry mixpanel amplitude" *.rs *.ts</span></div>
+          <div><span class="ok">→ none.</span></div>
+          <div><span class="c"># every outbound HTTP call in the whole codebase:</span></div>
+          <div><span class="p">&gt; findstr /S /I /N "ureq::post reqwest hyper" *.rs</span></div>
+          <div><span class="ok">→ all of them in notifier.rs — the accountability channel you set up. Nothing else.</span></div>
         </div>
       </div>
     </section>

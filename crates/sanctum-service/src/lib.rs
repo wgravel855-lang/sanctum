@@ -10,4 +10,5 @@ pub mod intervention;
 pub mod ipc;
 pub mod lists;
 pub mod netcfg;
+pub mod notifier;
 pub mod service;

@@ -246,6 +246,7 @@ impl IpcHandler {
                 db.save_config(&cfg)?;
                 self.apply_enforcement(&db)?; // stop sinkholing + clear floor + flush
                 db.record_event("protection_disabled", "", now)?;
+                notify_partner(&db, "Protection was turned OFF.");
                 Response::Ok
             }
 
@@ -255,6 +256,7 @@ impl IpcHandler {
                 db.save_config(&cfg)?;
                 self.apply_enforcement(&db)?; // re-arm blocking + floor + flush
                 db.record_event("protection_enabled", "", now)?;
+                notify_partner(&db, "Protection was turned back on.");
                 Response::Ok
             }
 
@@ -280,6 +282,9 @@ impl IpcHandler {
                     "",
                     now,
                 )?;
+                if !enabled {
+                    notify_partner(&db, "Bypass-tool blocking (VPN/proxy/Tor) was turned off.");
+                }
                 Response::Ok
             }
 
@@ -301,6 +306,9 @@ impl IpcHandler {
                 db.save_config(&cfg)?;
                 self.apply_enforcement(&db)?;
                 db.record_event(if enabled { "strict_on" } else { "strict_off" }, "", now)?;
+                if !enabled {
+                    notify_partner(&db, "Strict mode was turned off.");
+                }
                 Response::Ok
             }
 
@@ -321,6 +329,130 @@ impl IpcHandler {
                         Response::Ok
                     }
                     Err(e) => denied(&e.to_string()),
+                }
+            }
+
+            Command::SetAccountability { webhook, password } => {
+                let mut cfg = db.load_config()?;
+                let old = cfg.accountability_webhook.trim().to_string();
+                let new = webhook.trim().to_string();
+                if old == new {
+                    return Ok(Response::Ok); // no change
+                }
+                // Changing or removing an EXISTING partner is a weakening op:
+                // password-gated, frozen while locked, and it alerts the current
+                // partner first — oversight can't be cut silently.
+                if !old.is_empty() {
+                    if locked {
+                        return Ok(denied(
+                            "The accountability partner is frozen during a locked session.",
+                        ));
+                    }
+                    if !check_password(&db, &password)? {
+                        return Ok(denied("Incorrect password."));
+                    }
+                    crate::notifier::notify(
+                        &old,
+                        &stamped(if new.is_empty() {
+                            "The accountability partner was removed from Sanctum."
+                        } else {
+                            "The accountability channel was changed to a different one."
+                        }),
+                    );
+                }
+                cfg.accountability_webhook = new.clone();
+                db.save_config(&cfg)?;
+                db.record_event(
+                    if new.is_empty() { "accountability_off" } else { "accountability_set" },
+                    "",
+                    now,
+                )?;
+                if !new.is_empty() {
+                    crate::notifier::notify(
+                        &new,
+                        &stamped(
+                            "You are now an accountability partner for a Sanctum user. You'll get \
+                             a short note if their protection is turned off or weakened. Sanctum \
+                             never shares what they browse.",
+                        ),
+                    );
+                }
+                Response::Ok
+            }
+
+            Command::SetAccountabilitySms { sid, token, from, to, password } => {
+                let mut cfg = db.load_config()?;
+                let had = cfg.sms_configured();
+                let removing = sid.trim().is_empty()
+                    || token.trim().is_empty()
+                    || from.trim().is_empty()
+                    || to.trim().is_empty();
+                // Changing or removing an existing SMS channel is weakening.
+                if had {
+                    if locked {
+                        return Ok(denied(
+                            "The accountability partner is frozen during a locked session.",
+                        ));
+                    }
+                    if !check_password(&db, &password)? {
+                        return Ok(denied("Incorrect password."));
+                    }
+                    notify_partner(
+                        &db,
+                        if removing {
+                            "SMS accountability was removed."
+                        } else {
+                            "The SMS accountability details were changed."
+                        },
+                    );
+                }
+                cfg.sms_account_sid = sid.trim().to_string();
+                cfg.sms_auth_token = token.trim().to_string();
+                cfg.sms_from = from.trim().to_string();
+                cfg.sms_to = to.trim().to_string();
+                db.save_config(&cfg)?;
+                db.record_event(
+                    if cfg.sms_configured() { "accountability_sms_set" } else { "accountability_sms_off" },
+                    "",
+                    now,
+                )?;
+                if cfg.sms_configured() && !had {
+                    crate::notifier::send_sms(
+                        &cfg.sms_account_sid,
+                        &cfg.sms_auth_token,
+                        &cfg.sms_from,
+                        &cfg.sms_to,
+                        "Sanctum: you're now an accountability partner. You'll get a text if protection is turned off or weakened.",
+                    );
+                }
+                Response::Ok
+            }
+
+            Command::TestAccountability => {
+                let cfg = db.load_config()?;
+                let w = cfg.accountability_webhook.trim();
+                let mut any = false;
+                if !w.is_empty() {
+                    crate::notifier::notify(
+                        w,
+                        &stamped("Test from Sanctum. Your accountability channel is working."),
+                    );
+                    any = true;
+                }
+                if cfg.sms_configured() {
+                    crate::notifier::send_sms(
+                        &cfg.sms_account_sid,
+                        &cfg.sms_auth_token,
+                        &cfg.sms_from,
+                        &cfg.sms_to,
+                        "Sanctum: test message. Your SMS accountability is working.",
+                    );
+                    any = true;
+                }
+                if any {
+                    Response::Ok
+                } else {
+                    denied("No accountability partner is set.")
                 }
             }
 
@@ -354,6 +486,8 @@ impl IpcHandler {
         let cfg = db.load_config()?;
         let blocking_now =
             cfg.protection_enabled && cfg.schedule.is_active_at(chrono::Local::now());
+        let accountability_on = !cfg.accountability_webhook.trim().is_empty();
+        let accountability_sms_on = cfg.sms_configured();
         Ok(Status {
             protection_active: cfg.protection_enabled,
             blocking_now,
@@ -370,6 +504,8 @@ impl IpcHandler {
             block_bypass: cfg.block_bypass,
             block_strict: cfg.block_strict,
             uninstall_cooldown_hours: cfg.uninstall_cooldown_hours,
+            accountability_on,
+            accountability_sms_on,
             has_password: db.has_password()?,
             all_browsers: true,
         })
@@ -379,6 +515,35 @@ impl IpcHandler {
 fn denied(msg: &str) -> Response {
     Response::Denied {
         reason: msg.to_string(),
+    }
+}
+
+/// Prefix an accountability message with a local timestamp.
+fn stamped(text: &str) -> String {
+    format!(
+        "Sanctum · {}\n{text}",
+        chrono::Local::now().format("%b %d, %I:%M %p")
+    )
+}
+
+/// Post a short accountability signal to the user's webhook if one is set.
+/// Best-effort and non-blocking (the notifier spawns its own thread). Only ever
+/// sends the given short text — never any browsing content.
+fn notify_partner(db: &Db, text: &str) {
+    if let Ok(cfg) = db.load_config() {
+        let w = cfg.accountability_webhook.trim();
+        if !w.is_empty() {
+            crate::notifier::notify(w, &stamped(text));
+        }
+        if cfg.sms_configured() {
+            crate::notifier::send_sms(
+                &cfg.sms_account_sid,
+                &cfg.sms_auth_token,
+                &cfg.sms_from,
+                &cfg.sms_to,
+                &format!("Sanctum: {text}"),
+            );
+        }
     }
 }
 

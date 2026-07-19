@@ -29,6 +29,8 @@ export interface Status {
   block_bypass: boolean;
   block_strict: boolean;
   uninstall_cooldown_hours: number;
+  accountability_on: boolean;
+  accountability_sms_on: boolean;
   has_password: boolean;
   all_browsers: boolean;
 }
@@ -57,6 +59,9 @@ export type Command =
   | { cmd: "set_bypass_blocking"; enabled: boolean; password: string }
   | { cmd: "set_strict_mode"; enabled: boolean; password: string }
   | { cmd: "set_uninstall_cooldown"; hours: number }
+  | { cmd: "set_accountability"; webhook: string; password: string }
+  | { cmd: "set_accountability_sms"; sid: string; token: string; from: string; to: string; password: string }
+  | { cmd: "test_accountability" }
   | { cmd: "delete_history" }
   | { cmd: "poll_intervention" }
   | { cmd: "trigger_intervention" }

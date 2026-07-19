@@ -124,6 +124,34 @@ pub struct AppConfig {
     /// Mode is still the honest escape, exactly like a locked session.
     #[serde(default)]
     pub uninstall_cooldown_hours: u32,
+    /// Opt-in accountability webhook URL (empty = off). Short, human-readable
+    /// protection-state signals are POSTed here — never browsing content. Adding
+    /// one strengthens protection (easy); changing or removing it is a weakening
+    /// op (password-gated, frozen while locked) that first alerts the current
+    /// partner, so oversight can't be cut silently.
+    #[serde(default)]
+    pub accountability_webhook: String,
+    /// Opt-in Twilio SMS accountability. All four must be set for it to send;
+    /// any empty = off. Same weakening rules as the webhook. The auth token is a
+    /// secret and lives only in the ACL-locked local store.
+    #[serde(default)]
+    pub sms_account_sid: String,
+    #[serde(default)]
+    pub sms_auth_token: String,
+    #[serde(default)]
+    pub sms_from: String,
+    #[serde(default)]
+    pub sms_to: String,
+}
+
+impl AppConfig {
+    /// True if a full Twilio SMS accountability channel is configured.
+    pub fn sms_configured(&self) -> bool {
+        !self.sms_account_sid.trim().is_empty()
+            && !self.sms_auth_token.trim().is_empty()
+            && !self.sms_from.trim().is_empty()
+            && !self.sms_to.trim().is_empty()
+    }
 }
 
 fn default_true() -> bool {
@@ -145,6 +173,11 @@ impl Default for AppConfig {
             block_doh_ips: true,
             block_plaintext_dns: false,
             uninstall_cooldown_hours: 0,
+            accountability_webhook: String::new(),
+            sms_account_sid: String::new(),
+            sms_auth_token: String::new(),
+            sms_from: String::new(),
+            sms_to: String::new(),
         }
     }
 }

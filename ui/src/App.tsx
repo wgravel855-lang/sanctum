@@ -7,6 +7,7 @@ import Schedule from "./screens/Schedule";
 import BlockList from "./screens/BlockList";
 import Progress from "./screens/Progress";
 import Letter from "./screens/Letter";
+import Accountability from "./screens/Accountability";
 import UrgeOverlay from "./components/UrgeOverlay";
 
 export type Screen =
@@ -15,7 +16,8 @@ export type Screen =
   | "schedule"
   | "blocklist"
   | "progress"
-  | "letter";
+  | "letter"
+  | "accountability";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("home");
@@ -45,7 +47,15 @@ export default function App() {
           <Home status={status} onNavigate={setScreen} onUrge={() => setUrge(true)} />
         )}
         {screen === "protection" && (
-          <Protection status={status} onBack={back} refresh={refresh} />
+          <Protection
+            status={status}
+            onBack={back}
+            refresh={refresh}
+            onOpenAccountability={() => setScreen("accountability")}
+          />
+        )}
+        {screen === "accountability" && (
+          <Accountability status={status} onBack={() => setScreen("protection")} refresh={refresh} />
         )}
         {screen === "schedule" && <Schedule status={status} onBack={back} refresh={refresh} />}
         {screen === "blocklist" && (

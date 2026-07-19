@@ -30,6 +30,8 @@ const mockStatus: Status = {
   block_bypass: true,
   block_strict: false,
   uninstall_cooldown_hours: 0,
+  accountability_on: false,
+  accountability_sms_on: false,
   has_password: false,
   all_browsers: true,
 };
@@ -46,6 +48,8 @@ let mockEvents: EventDto[] = (() => {
   return evs;
 })();
 let mockPassword: string | null = null;
+let mockAccountabilityWebhook = "";
+let mockSms = { sid: "", token: "", from: "", to: "" };
 let mockCustomBlocks: string[] = ["distracting-site.net", "one-more-thing.com"];
 let mockLetter: string | null =
   "Remember why you started. The version of you that set this up was thinking clearly and wanted better for you. This feeling passes. You are not missing anything real.";
@@ -133,6 +137,34 @@ async function mockCommand(cmd: Command): Promise<Response> {
       mockStatus.uninstall_cooldown_hours = want;
       return { resp: "ok" };
     }
+    case "set_accountability": {
+      const old = mockAccountabilityWebhook.trim();
+      const next = cmd.webhook.trim();
+      if (old && next !== old) {
+        if (mockStatus.locked)
+          return { resp: "denied", body: { reason: "The accountability partner is frozen during a locked session." } };
+        if (!gate(cmd.password)) return { resp: "denied", body: { reason: "Incorrect password." } };
+      }
+      mockAccountabilityWebhook = next;
+      mockStatus.accountability_on = next.length > 0;
+      return { resp: "ok" };
+    }
+    case "set_accountability_sms": {
+      const had = mockSms.sid && mockSms.token && mockSms.from && mockSms.to;
+      const complete = cmd.sid.trim() && cmd.token.trim() && cmd.from.trim() && cmd.to.trim();
+      if (had) {
+        if (mockStatus.locked)
+          return { resp: "denied", body: { reason: "The accountability partner is frozen during a locked session." } };
+        if (!gate(cmd.password)) return { resp: "denied", body: { reason: "Incorrect password." } };
+      }
+      mockSms = { sid: cmd.sid.trim(), token: cmd.token.trim(), from: cmd.from.trim(), to: cmd.to.trim() };
+      mockStatus.accountability_sms_on = !!complete;
+      return { resp: "ok" };
+    }
+    case "test_accountability":
+      return mockAccountabilityWebhook.trim() || mockStatus.accountability_sms_on
+        ? { resp: "ok" }
+        : { resp: "denied", body: { reason: "No accountability partner is set." } };
     case "resolve_intervention":
       mockStatus.urges_resisted += 1;
       return { resp: "ok" };

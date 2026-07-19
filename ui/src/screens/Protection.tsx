@@ -44,10 +44,12 @@ export default function Protection({
   status,
   onBack,
   refresh,
+  onOpenAccountability,
 }: {
   status: Status | null;
   onBack: () => void;
   refresh: () => void;
+  onOpenAccountability: () => void;
 }) {
   const locked = !!status?.locked;
   const active = !!status?.protection_active;
@@ -362,6 +364,21 @@ export default function Protection({
             Mode. That friction is the point. It's meant to outlast a craving, not to be impossible.
           </GroupFootnote>
         )}
+      </div>
+
+      {/* Accountability partner. */}
+      <div className="mt-8">
+        <Group>
+          <Row onClick={onOpenAccountability}>
+            <span className="flex flex-col">
+              <span className="t-row-title">Accountability</span>
+              <span className="t-caption">Alert a trusted person if protection is weakened</span>
+            </span>
+            <span className="row-trailing t-subtitle">
+              {status?.accountability_on || status?.accountability_sms_on ? "On" : "Off"} ›
+            </span>
+          </Row>
+        </Group>
       </div>
 
       {/* Opt-in uninstall cooldown — binding once set (grow-only). */}
