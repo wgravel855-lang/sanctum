@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Status } from "../lib/types";
-import { listCustomBlocks, sendCommand } from "../lib/ipc";
+import { listCustomBlocks, listKeywords, sendCommand } from "../lib/ipc";
 import TopBar from "../components/TopBar";
 import Button from "../components/Button";
 import { Group, GroupFootnote, GroupLabel, Row } from "../components/List";
@@ -19,7 +19,11 @@ export default function BlockList({
   const approvalOn = !!status?.require_partner_approval;
   const pending = status?.pending_unblock ?? null;
 
+  const keywordsOn = !!status?.block_keywords;
+
   const [custom, setCustom] = useState<string[]>([]);
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [keyword, setKeyword] = useState("");
   const [domain, setDomain] = useState("");
   const [unblockDomain, setUnblockDomain] = useState("");
   const [code, setCode] = useState("");
@@ -30,11 +34,37 @@ export default function BlockList({
 
   const loadCustom = useCallback(async () => {
     setCustom(await listCustomBlocks());
+    setKeywords(await listKeywords());
   }, []);
 
   useEffect(() => {
     loadCustom();
   }, [loadCustom]);
+
+  const addKeyword = async () => {
+    const w = keyword.trim().toLowerCase();
+    if (!w) return;
+    setBusy(true);
+    setNote(null);
+    const r = await sendCommand({ cmd: "add_keyword", word: w });
+    setNote(r.resp === "ok" ? `Added "${w}"` : `Couldn't add "${w}"`);
+    setKeyword("");
+    await loadCustom();
+    await refresh();
+    setBusy(false);
+  };
+
+  const removeKeyword = async (w: string) => {
+    setBusy(true);
+    setNote(null);
+    const r = await sendCommand({ cmd: "remove_keyword", word: w, password });
+    if (r.resp === "ok") setNote(`Removed "${w}"`);
+    else if (r.resp === "denied") setNote(r.body.reason);
+    setPassword("");
+    await loadCustom();
+    await refresh();
+    setBusy(false);
+  };
 
   const add = async () => {
     const d = domain.trim().toLowerCase();
@@ -218,6 +248,54 @@ export default function BlockList({
           <GroupFootnote>Sanctum sends your partner a one-time code for this exact site. Only they can approve it.</GroupFootnote>
         </div>
       )}
+
+      {/* Keyword rules. Domain-name matching only — never page content. */}
+      <div className="mt-8">
+        <GroupLabel>Your keywords</GroupLabel>
+        {keywords.length === 0 ? (
+          <p className="t-caption px-4">
+            No keywords of your own yet. Sanctum already uses a built-in set.
+          </p>
+        ) : (
+          <Group>
+            {keywords.map((w) => (
+              <Row key={w}>
+                <span className="t-row-title truncate">{w}</span>
+                <span className="row-trailing">
+                  {locked ? (
+                    <span className="t-caption">Locked</span>
+                  ) : (
+                    <button
+                      onClick={() => removeKeyword(w)}
+                      disabled={busy}
+                      className="pressable text-[15px] text-destructive disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </span>
+              </Row>
+            ))}
+          </Group>
+        )}
+        <input
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addKeyword()}
+          placeholder="word to block"
+          spellCheck={false}
+          autoCapitalize="none"
+          className="field mt-3"
+        />
+        <Button className="mt-3" onClick={addKeyword} disabled={busy}>
+          Add keyword
+        </Button>
+        <GroupFootnote>
+          {keywordsOn
+            ? "Matched against a site's web address only, never the page itself. Words shorter than five letters must match whole, so essex.ac.uk keeps working."
+            : "Turn on Block by keyword in Protection for these to take effect. They match a site's web address only, never the page itself."}
+        </GroupFootnote>
+      </div>
 
       <div className="mt-8">
         <GroupLabel>Add a site</GroupLabel>

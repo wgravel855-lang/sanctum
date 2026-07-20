@@ -28,6 +28,8 @@ export interface Status {
   custom_block_count: number;
   block_bypass: boolean;
   block_strict: boolean;
+  block_keywords: boolean;
+  custom_keyword_count: number;
   uninstall_cooldown_hours: number;
   accountability_on: boolean;
   accountability_sms_on: boolean;
@@ -62,6 +64,10 @@ export type Command =
   | { cmd: "enable_protection" }
   | { cmd: "set_bypass_blocking"; enabled: boolean; password: string }
   | { cmd: "set_strict_mode"; enabled: boolean; password: string }
+  | { cmd: "set_keyword_blocking"; enabled: boolean; password: string }
+  | { cmd: "list_keywords" }
+  | { cmd: "add_keyword"; word: string }
+  | { cmd: "remove_keyword"; word: string; password: string }
   | { cmd: "set_uninstall_cooldown"; hours: number }
   | { cmd: "set_accountability"; webhook: string; password: string }
   | { cmd: "set_accountability_sms"; sid: string; token: string; from: string; to: string; password: string }
@@ -88,6 +94,7 @@ export type Response =
   | { resp: "status"; body: Status }
   | { resp: "events"; body: EventDto[] }
   | { resp: "custom_blocks"; body: string[] }
+  | { resp: "keywords"; body: string[] }
   | { resp: "deleted"; body: { count: number } }
   | { resp: "ok" }
   | { resp: "denied"; body: { reason: string } }

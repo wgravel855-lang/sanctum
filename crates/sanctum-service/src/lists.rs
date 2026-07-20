@@ -2,6 +2,7 @@
 //! before any on-disk copy exists. At runtime these are unioned with the
 //! user's custom list from the database.
 
+use sanctum_core::keyword::KeywordSet;
 use sanctum_core::{Blocklist, SafeSearchMap};
 use std::sync::OnceLock;
 
@@ -15,6 +16,7 @@ const BYPASS: &str = include_str!("../../../blocklist/bypass-domains.txt");
 const BYPASS_EXTRA: &str = include_str!("../../../blocklist/bypass-extra.txt");
 /// Strict-mode list: mainstream suggestive-content gateways (opt-in).
 const STRICT: &str = include_str!("../../../blocklist/strict-domains.txt");
+const KEYWORDS_TXT: &str = include_str!("../../../blocklist/keywords.txt");
 const DOH: &str = include_str!("../../../blocklist/doh-endpoints.txt");
 const SAFESEARCH: &str = include_str!("../../../blocklist/safesearch.map");
 
@@ -46,6 +48,13 @@ pub fn doh_list() -> Blocklist {
 pub fn strict_blocklist() -> Blocklist {
     static STRICT_SET: OnceLock<Blocklist> = OnceLock::new();
     STRICT_SET.get_or_init(|| Blocklist::parse(STRICT).0).clone()
+}
+
+/// The built-in keyword rules, matched against the domain NAME (never page
+/// content — see `sanctum_core::keyword`). Parsed once per process.
+pub fn keyword_rules() -> KeywordSet {
+    static KEYWORDS: OnceLock<KeywordSet> = OnceLock::new();
+    KEYWORDS.get_or_init(|| KeywordSet::parse(KEYWORDS_TXT)).clone()
 }
 
 /// Bypass-tool block set (DoH resolvers, VPN/proxy services, Tor). ~17k

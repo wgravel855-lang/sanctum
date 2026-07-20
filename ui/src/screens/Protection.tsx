@@ -17,6 +17,13 @@ const DURATIONS = [
 ];
 
 // Shown before the user commits to each mode, so nothing is a surprise.
+// Honest about the limit: Sanctum sees hostnames, not pages. Saying otherwise
+// would be the kind of overclaiming this app exists to avoid.
+const KEYWORDS_COPY = {
+  title: "Block by keyword?",
+  body: "Sanctum will block any site whose web address contains an adult word, even if it isn't on the block list yet. That catches new sites a fixed list can't keep up with.\n\nIt reads the address only, not the page. Sanctum can't see inside a site, because that would mean decrypting your traffic, and it will never do that.\n\nShort words are matched whole, so essex.ac.uk and analytics.google.com keep working. If something you need does get caught, you can allow it.",
+};
+
 const STRICT_COPY = {
   title: "Turn on Strict mode?",
   body: "Strict mode also blocks mainstream social and image-heavy sites like Instagram, Pinterest, Reddit, and TikTok, which often surface suggestive content. Those sites will stop loading in every browser on this computer.\n\nYou can turn Strict mode back off with your settings password, unless a locked session is running.",
@@ -65,12 +72,15 @@ export default function Protection({
   const [bypassPw, setBypassPw] = useState("");
   const [strictPrompt, setStrictPrompt] = useState(false);
   const [strictPw, setStrictPw] = useState("");
-  const [modal, setModal] = useState<null | "strict" | "cold">(null);
+  const [kwPrompt, setKwPrompt] = useState(false);
+  const [kwPw, setKwPw] = useState("");
+  const [modal, setModal] = useState<null | "strict" | "cold" | "keywords">(null);
   const [cooldownPicker, setCooldownPicker] = useState(false);
   const [pendingCooldown, setPendingCooldown] = useState<number | null>(null);
 
   const bypassOn = status?.block_bypass ?? true;
   const strictOn = status?.block_strict ?? false;
+  const keywordsOn = status?.block_keywords ?? false;
   const cooldownHours = status?.uninstall_cooldown_hours ?? 0;
 
   const handle = async (r: Response, okMsg?: string) => {
@@ -152,6 +162,32 @@ export default function Protection({
     setStrictPrompt(false);
   };
 
+  const setKeywords = async (enabled: boolean, pw: string) => {
+    setBusy(true);
+    await handle(
+      await sendCommand({ cmd: "set_keyword_blocking", enabled, password: pw }),
+      enabled ? "Keyword blocking on." : "Keyword blocking off.",
+    );
+    setBusy(false);
+  };
+
+  const toggleKeywords = (next: boolean) => {
+    setNote(null);
+    if (next) {
+      setModal("keywords"); // confirm first: explain what it can and can't do
+    } else if (hasPassword) {
+      setKwPrompt(true);
+    } else {
+      setKeywords(false, "");
+    }
+  };
+
+  const confirmKeywordsOff = async () => {
+    await setKeywords(false, kwPw);
+    setKwPw("");
+    setKwPrompt(false);
+  };
+
   const toggleColdTurkey = (next: boolean) => {
     setNote(null);
     if (next) setModal("cold"); // confirm before arming
@@ -224,6 +260,20 @@ export default function Protection({
             />
           </span>
         </Row>
+        <Row>
+          <span className="flex flex-col">
+            <span className="t-row-title">Block by keyword</span>
+            <span className="t-caption">Catch sites whose name gives them away</span>
+          </span>
+          <span className="row-trailing">
+            <Switch
+              checked={keywordsOn}
+              disabled={locked || busy}
+              onChange={toggleKeywords}
+              label="Block by keyword"
+            />
+          </span>
+        </Row>
       </Group>
 
       {strictPrompt && (
@@ -249,6 +299,35 @@ export default function Protection({
               Cancel
             </button>
             <Button variant="destructive" onClick={confirmStrictOff}>
+              Turn off
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {kwPrompt && (
+        <div className="mt-3">
+          <p className="t-caption mb-2 px-4">Enter your password to turn keyword blocking off.</p>
+          <input
+            type="password"
+            autoFocus
+            value={kwPw}
+            onChange={(e) => setKwPw(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && confirmKeywordsOff()}
+            placeholder="Password"
+            className="field"
+          />
+          <div className="mt-3 flex items-center justify-between">
+            <button
+              onClick={() => {
+                setKwPrompt(false);
+                setKwPw("");
+              }}
+              className="pressable text-[15px] text-text-2"
+            >
+              Cancel
+            </button>
+            <Button variant="destructive" onClick={confirmKeywordsOff}>
               Turn off
             </Button>
           </div>
@@ -436,6 +515,17 @@ export default function Protection({
         onConfirm={() => {
           setModal(null);
           setStrict(true, "");
+        }}
+        onCancel={() => setModal(null)}
+      />
+      <ConfirmModal
+        open={modal === "keywords"}
+        title={KEYWORDS_COPY.title}
+        body={KEYWORDS_COPY.body}
+        confirmLabel="Turn on keyword blocking"
+        onConfirm={() => {
+          setModal(null);
+          setKeywords(true, "");
         }}
         onCancel={() => setModal(null)}
       />

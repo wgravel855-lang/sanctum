@@ -109,6 +109,12 @@ pub struct AppConfig {
     /// frozen while locked).
     #[serde(default)]
     pub block_strict: bool,
+    /// Keyword rules matched against the domain NAME, catching self-describing
+    /// sites a fixed list misses. NOT page-content filtering (HTTPS hides that,
+    /// and Sanctum refuses to MITM). Opt-in, OFF by default; same gating as
+    /// strict mode.
+    #[serde(default)]
+    pub block_keywords: bool,
     /// Block known DoH provider IPs on :443 via Windows Firewall (safe; on).
     #[serde(default = "default_true")]
     pub block_doh_ips: bool,
@@ -213,6 +219,7 @@ impl Default for AppConfig {
             block_doh: true,
             block_bypass: true,
             block_strict: false,
+            block_keywords: false,
             block_doh_ips: true,
             block_plaintext_dns: false,
             uninstall_cooldown_hours: 0,

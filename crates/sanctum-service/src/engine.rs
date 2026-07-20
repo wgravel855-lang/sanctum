@@ -263,6 +263,17 @@ pub fn filter_state_from_db(db: &Db) -> anyhow::Result<(FilterState, Blocklist)>
     state.block_bypass = cfg.block_bypass;
     state.strict = lists::strict_blocklist();
     state.block_strict = cfg.block_strict;
+    // Keyword rules: the built-in curated set unioned with the user's own.
+    // User words go through `Keyword::user`, which pins short/ambiguous entries
+    // to whole-token matching so a 3-letter word can't take out half the web.
+    let mut keywords = lists::keyword_rules();
+    keywords.extend(
+        db.list_custom_keyword()?
+            .iter()
+            .map(|w| sanctum_core::keyword::Keyword::user(w)),
+    );
+    state.keywords = keywords;
+    state.block_keywords = cfg.block_keywords;
     Ok((state, block))
 }
 

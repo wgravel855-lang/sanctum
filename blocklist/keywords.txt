@@ -1,0 +1,76 @@
+# Sanctum keyword rules.
+#
+# These are matched against the DOMAIN NAME ONLY (what a DNS resolver can see).
+# This is not page-content filtering: HTTPS hides the URL path and the page
+# text, and Sanctum will not install a MITM root certificate to read them.
+#
+# Format:
+#   ~word   substring rule - may match anywhere inside a label. Only for long,
+#           distinctive terms that cannot appear inside ordinary words.
+#   word    token rule - must be a COMPLETE token within a label. Used for short
+#           or ambiguous terms so we never block essex.ac.uk or
+#           analytics.google.com. See keyword.rs for the reasoning.
+#
+# Deliberately NOT included: "teen" (would block adolescent health and
+# education resources) and slurs. Sensitive-but-legitimate topics such as
+# sexual health survive because token rules require a whole-word match.
+
+# ---- distinctive terms (substring) ----
+~porn
+~hentai
+~doujin
+~rule34
+~camgirl
+~camwhore
+~fetish
+~bdsm
+~bukkake
+~creampie
+~cumshot
+~blowjob
+~handjob
+~deepthroat
+~gangbang
+~threesome
+~masturbat
+~orgasm
+~brothel
+~stripclub
+~escorts
+~onlyfans
+~fapp
+~jerkoff
+~upskirt
+~voyeur
+~incest
+~shemale
+~futanari
+~nudegirl
+~nudephoto
+~sexcam
+~sexchat
+~sexvideo
+~sextape
+~xxxvideo
+~adultvideo
+~adultfilm
+
+# ---- short or ambiguous terms (whole token only) ----
+sex
+anal
+cum
+cunt
+milf
+nsfw
+nude
+nudes
+boobs
+tits
+titty
+xxx
+porno
+erotica
+erotic
+hardcore
+lewd
+ecchi

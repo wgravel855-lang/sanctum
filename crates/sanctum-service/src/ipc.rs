@@ -353,6 +353,58 @@ impl IpcHandler {
                 Response::Ok
             }
 
+            Command::SetKeywordBlocking { enabled, password } => {
+                // Same gating as Strict mode: enabling strengthens (always
+                // allowed); disabling is password-gated and frozen while locked.
+                if !enabled {
+                    if locked {
+                        return Ok(denied(
+                            "Keyword blocking can't be turned off during a locked session.",
+                        ));
+                    }
+                    if !check_password(&db, &password)? {
+                        return Ok(denied("Incorrect password."));
+                    }
+                }
+                let mut cfg = db.load_config()?;
+                cfg.block_keywords = enabled;
+                db.save_config(&cfg)?;
+                self.apply_enforcement(&db)?;
+                db.record_event(
+                    if enabled { "keywords_on" } else { "keywords_off" },
+                    "",
+                    now,
+                )?;
+                if !enabled {
+                    notify_partner(&db, "Keyword blocking was turned off.");
+                }
+                Response::Ok
+            }
+
+            Command::ListKeywords => Response::Keywords(db.list_custom_keyword()?),
+
+            Command::AddKeyword { word } => {
+                db.add_custom_keyword(&word, now)?;
+                self.apply_enforcement(&db)?;
+                db.record_event("keyword_add", word.trim(), now)?;
+                Response::Ok
+            }
+
+            Command::RemoveKeyword { word, password } => {
+                if locked {
+                    return Ok(denied(
+                        "Keyword rules can only be added during a locked session.",
+                    ));
+                }
+                if !check_password(&db, &password)? {
+                    return Ok(denied("Incorrect password."));
+                }
+                db.remove_custom_keyword(&word)?;
+                self.apply_enforcement(&db)?;
+                db.record_event("keyword_remove", word.trim(), now)?;
+                Response::Ok
+            }
+
             Command::SetPartnerApproval { enabled, password } => {
                 let mut cfg = db.load_config()?;
                 if cfg.require_partner_approval == enabled {
@@ -698,6 +750,8 @@ impl IpcHandler {
             custom_block_count: db.list_custom_block()?.len(),
             block_bypass: cfg.block_bypass,
             block_strict: cfg.block_strict,
+            block_keywords: cfg.block_keywords,
+            custom_keyword_count: db.list_custom_keyword()?.len(),
             uninstall_cooldown_hours: cfg.uninstall_cooldown_hours,
             accountability_on,
             accountability_sms_on,

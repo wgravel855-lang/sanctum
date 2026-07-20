@@ -54,6 +54,16 @@ pub enum Command {
     /// Enabling is always allowed; disabling is password-gated and frozen while
     /// locked.
     SetStrictMode { enabled: bool, password: String },
+    /// Toggle keyword blocking (domain-NAME matching, never page content).
+    /// Enabling is always allowed; disabling is password-gated and frozen while
+    /// locked, exactly like Strict mode.
+    SetKeywordBlocking { enabled: bool, password: String },
+    /// The user's own keyword rules (the built-in set is not returned).
+    ListKeywords,
+    /// Add a keyword. Always allowed (grow-only, strengthens protection).
+    AddKeyword { word: String },
+    /// Remove a user keyword. Refused while locked; else password-gated.
+    RemoveKeyword { word: String, password: String },
     /// Set the opt-in uninstall cooldown, in hours (0 = off). GROW-ONLY: once
     /// set above zero it can only be increased, never reduced or disabled. Only
     /// ever strengthens, so no password is required.
@@ -118,6 +128,8 @@ pub enum Response {
     Events(Vec<EventDto>),
     /// The user's custom (removable) blocked domains.
     CustomBlocks(Vec<String>),
+    /// The user's own keyword rules.
+    Keywords(Vec<String>),
     /// A history wipe report (rows deleted).
     Deleted { count: usize },
     /// The command succeeded.
@@ -166,6 +178,12 @@ pub struct Status {
     /// Whether Strict mode (suggestive-content gateways) is on.
     #[serde(default)]
     pub block_strict: bool,
+    /// Whether keyword blocking (domain-name matching) is on.
+    #[serde(default)]
+    pub block_keywords: bool,
+    /// How many keyword rules the user has added of their own.
+    #[serde(default)]
+    pub custom_keyword_count: usize,
     /// The opt-in uninstall cooldown in hours (0 = off). Grow-only once set.
     #[serde(default)]
     pub uninstall_cooldown_hours: u32,

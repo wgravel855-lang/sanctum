@@ -74,6 +74,10 @@ impl Db {
             CREATE TABLE IF NOT EXISTS protected_days (
                 day TEXT PRIMARY KEY
             );
+            CREATE TABLE IF NOT EXISTS custom_keyword (
+                word     TEXT PRIMARY KEY,
+                added_at INTEGER NOT NULL
+            );
             "#,
         )?;
         self.set_kv("schema_version", &SCHEMA_VERSION.to_string())?;
@@ -176,6 +180,40 @@ impl Db {
         let mut stmt = self
             .conn
             .prepare("SELECT domain FROM custom_block ORDER BY domain")?;
+        let rows = stmt
+            .query_map([], |r| r.get::<_, String>(0))?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    // ---- user keyword rules (matched against the domain name) ----
+
+    /// Add a keyword. Stored lowercased; the match mode is derived on load
+    /// (short words are pinned to whole-token matching — see `keyword::Keyword`).
+    pub fn add_custom_keyword(&self, word: &str, now: DateTime<Utc>) -> Result<()> {
+        let w = word.trim().to_lowercase();
+        if w.is_empty() {
+            return Ok(());
+        }
+        self.conn.execute(
+            "INSERT OR IGNORE INTO custom_keyword(word, added_at) VALUES(?1, ?2)",
+            params![w, now.timestamp()],
+        )?;
+        Ok(())
+    }
+
+    pub fn remove_custom_keyword(&self, word: &str) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM custom_keyword WHERE word = ?1",
+            params![word.trim().to_lowercase()],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_custom_keyword(&self) -> Result<Vec<String>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT word FROM custom_keyword ORDER BY word")?;
         let rows = stmt
             .query_map([], |r| r.get::<_, String>(0))?
             .collect::<std::result::Result<Vec<_>, _>>()?;

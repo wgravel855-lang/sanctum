@@ -18,6 +18,7 @@ pub mod domain;
 pub mod error;
 pub mod hosts;
 pub mod ipc;
+pub mod keyword;
 pub mod password;
 pub mod paths;
 pub mod safesearch;

@@ -29,6 +29,8 @@ const mockStatus: Status = {
   custom_block_count: 2,
   block_bypass: true,
   block_strict: false,
+  block_keywords: false,
+  custom_keyword_count: 0,
   uninstall_cooldown_hours: 0,
   accountability_on: false,
   accountability_sms_on: false,
@@ -55,6 +57,7 @@ let mockPassword: string | null = null;
 let mockAccountabilityWebhook = "";
 let mockSms = { sid: "", token: "", from: "", to: "" };
 let mockPending: { domain: string; code: string; attempts: number } | null = null;
+let mockKeywords: string[] = [];
 let mockCustomBlocks: string[] = ["distracting-site.net", "one-more-thing.com"];
 let mockLetter: string | null =
   "Remember why you started. The version of you that set this up was thinking clearly and wanted better for you. This feeling passes. You are not missing anything real.";
@@ -135,6 +138,30 @@ async function mockCommand(cmd: Command): Promise<Response> {
         if (!gate(cmd.password)) return { resp: "denied", body: { reason: "Incorrect password." } };
       }
       mockStatus.block_strict = cmd.enabled;
+      return { resp: "ok" };
+    case "set_keyword_blocking":
+      if (!cmd.enabled) {
+        if (mockStatus.locked)
+          return { resp: "denied", body: { reason: "Keyword blocking can't be turned off during a locked session." } };
+        if (!gate(cmd.password)) return { resp: "denied", body: { reason: "Incorrect password." } };
+      }
+      mockStatus.block_keywords = cmd.enabled;
+      return { resp: "ok" };
+    case "list_keywords":
+      return { resp: "keywords", body: [...mockKeywords] };
+    case "add_keyword": {
+      const w = cmd.word.trim().toLowerCase();
+      if (w && !mockKeywords.includes(w)) mockKeywords.push(w);
+      mockKeywords.sort();
+      mockStatus.custom_keyword_count = mockKeywords.length;
+      return { resp: "ok" };
+    }
+    case "remove_keyword":
+      if (mockStatus.locked)
+        return { resp: "denied", body: { reason: "Keyword rules can only be added during a locked session." } };
+      if (!gate(cmd.password)) return { resp: "denied", body: { reason: "Incorrect password." } };
+      mockKeywords = mockKeywords.filter((w) => w !== cmd.word.trim().toLowerCase());
+      mockStatus.custom_keyword_count = mockKeywords.length;
       return { resp: "ok" };
     case "set_uninstall_cooldown": {
       const cur = mockStatus.uninstall_cooldown_hours;
@@ -258,6 +285,11 @@ export async function recentEvents(limit = 50): Promise<EventDto[]> {
 export async function listCustomBlocks(): Promise<string[]> {
   const r = await sendCommand({ cmd: "list_custom_blocks" });
   return r.resp === "custom_blocks" ? r.body : [];
+}
+
+export async function listKeywords(): Promise<string[]> {
+  const r = await sendCommand({ cmd: "list_keywords" });
+  return r.resp === "keywords" ? r.body : [];
 }
 
 export async function getLetter(): Promise<string | null> {

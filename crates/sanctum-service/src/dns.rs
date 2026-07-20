@@ -31,6 +31,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, UdpSocket};
 use tokio::sync::mpsc;
 
+use sanctum_core::keyword::KeywordSet;
 use sanctum_core::{domain, Blocklist, SafeSearchMap};
 
 /// Short TTL so un-blocks / list edits propagate to clients quickly.
@@ -56,6 +57,9 @@ enum Decision {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SinkKind {
     Blocked,
+    /// Matched a keyword rule on the domain name. Treated as a real adult hit
+    /// (it feeds the intervention debouncer exactly like `Blocked`).
+    Keyword,
     Doh,
     Bypass,
     Strict,
@@ -76,10 +80,15 @@ pub struct FilterState {
     /// Strict-mode gateways (mainstream suggestive-content sites). Blocked when
     /// `block_strict` is on. Opt-in and off by default.
     pub strict: Blocklist,
+    /// Keyword rules matched against the domain NAME (built-in ∪ the user's).
+    /// Catches the long tail of self-describing domains a fixed list misses.
+    /// Blocked when `block_keywords` is on. Opt-in and off by default.
+    pub keywords: KeywordSet,
     pub enforce_safesearch: bool,
     pub block_doh: bool,
     pub block_bypass: bool,
     pub block_strict: bool,
+    pub block_keywords: bool,
 }
 
 impl FilterState {
@@ -91,10 +100,12 @@ impl FilterState {
             doh,
             bypass: Blocklist::new(),
             strict: Blocklist::new(),
+            keywords: KeywordSet::new(),
             enforce_safesearch: true,
             block_doh: true,
             block_bypass: false,
             block_strict: false,
+            block_keywords: false,
         }
     }
 
@@ -111,6 +122,8 @@ impl FilterState {
             Decision::Forward
         } else if self.blocklist.is_blocked(host) {
             Decision::Sink(SinkKind::Blocked)
+        } else if self.block_keywords && self.keywords.is_blocked(host) {
+            Decision::Sink(SinkKind::Keyword)
         } else if self.block_doh && self.doh.is_blocked(host) {
             Decision::Sink(SinkKind::Doh)
         } else if self.block_bypass && self.bypass.is_blocked(host) {
@@ -211,8 +224,9 @@ impl Resolver {
                 resp.set_response_code(ResponseCode::NXDomain);
                 resp
             }
-            Decision::Sink(SinkKind::Blocked) => {
-                // A real adult-block hit: feed the intervention debouncer.
+            Decision::Sink(SinkKind::Blocked) | Decision::Sink(SinkKind::Keyword) => {
+                // A real adult-block hit (listed, or matched by name): feed the
+                // intervention debouncer.
                 if let Some(tx) = self.block_tx.get() {
                     let _ = tx.send(host.clone());
                 }
@@ -487,6 +501,32 @@ mod tests {
         r.update(st);
         assert_eq!(r.classify("instagram.com"), Decision::Sink(SinkKind::Strict));
         assert_eq!(r.classify("www.instagram.com"), Decision::Sink(SinkKind::Strict));
+    }
+
+    #[test]
+    fn keyword_gate_and_no_false_positives() {
+        let r = resolver();
+        let mut st = r.state.read().unwrap().clone();
+        st.keywords = sanctum_core::keyword::KeywordSet::parse("~porn\nsex\n");
+        r.update(st.clone());
+        // Off by default -> forwarded even though the name would match.
+        assert_eq!(r.classify("freeporn.com"), Decision::Forward);
+
+        // On -> sinkholed as Keyword, which DOES feed the intervention
+        // debouncer (a keyword-matched adult domain is a real urge moment).
+        st.block_keywords = true;
+        r.update(st.clone());
+        assert_eq!(r.classify("freeporn.com"), Decision::Sink(SinkKind::Keyword));
+        assert_eq!(r.classify("sex.com"), Decision::Sink(SinkKind::Keyword));
+
+        // Short keywords are token-matched, so ordinary sites survive.
+        assert_eq!(r.classify("essex.ac.uk"), Decision::Forward);
+        assert_eq!(r.classify("analytics.google.com"), Decision::Forward);
+
+        // An explicit allowlist entry still wins over a keyword match.
+        st.allowlist.insert("freeporn.com".to_string());
+        r.update(st);
+        assert_eq!(r.classify("freeporn.com"), Decision::Forward);
     }
 
     #[test]
