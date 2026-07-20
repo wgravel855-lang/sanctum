@@ -55,7 +55,28 @@ jobs:
           path: dist/Sanctum-Windows-Setup.exe
           if-no-files-found: error
 
+      # SignPath is a one-time setup (see SIGNING.md) and may not be configured
+      # yet. Without this gate the sign step fails on every tag, which both
+      # produces a misleading red run and skips the attach step anyway. When it
+      # is unconfigured we simply build, publish the unsigned installer as a
+      # workflow artifact, and leave the GitHub Release alone.
+      - name: Check signing configuration
+        id: signing
+        shell: bash
+        env:
+          SIGNPATH_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORG: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+        run: |
+          if [ -n "$SIGNPATH_TOKEN" ] && [ -n "$SIGNPATH_ORG" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SignPath is not configured, so signing was skipped and the release was left untouched. The unsigned installer is attached to this run as a build artifact. See SIGNING.md."
+            echo "SignPath not configured - built unsigned, release untouched." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Sign with SignPath
+        if: steps.signing.outputs.enabled == 'true'
         uses: signpath/github-action-submit-signing-request@v1
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -67,15 +88,19 @@ jobs:
           output-artifact-directory: signed
 
       - name: Upload signed installer as a build artifact
+        if: steps.signing.outputs.enabled == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: installer-signed
           path: signed/**
 
+      # Only ever touches the release when a genuinely SIGNED binary exists.
+      # `generate_release_notes` is deliberately off: releases are published with
+      # hand-written notes carrying the installer's SHA-256, and auto-generated
+      # notes would overwrite them.
       - name: Attach signed installer to the release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: steps.signing.outputs.enabled == 'true' && startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: signed/Sanctum-Windows-Setup.exe
-          generate_release_notes: true
           fail_on_unmatched_files: true
