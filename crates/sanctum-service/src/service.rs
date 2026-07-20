@@ -28,6 +28,11 @@ pub const WATCHDOG_NAME: &str = "SanctumWatchdog";
 
 const RECONCILE_SECS: u32 = 20;
 
+/// How many reconcile passes between accountability-heartbeat due-checks. The
+/// heartbeat itself is weekly; checking every ~10 minutes (30 * 20s) is plenty
+/// granular and keeps the hot loop cheap.
+const HEARTBEAT_CHECK_PASSES: u32 = 30;
+
 // ---------------------------------------------------------------------------
 // SCM dispatcher
 // ---------------------------------------------------------------------------
@@ -218,6 +223,7 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
     //    resolver and keeps adapter DNS consistent with whether it's serving,
     //    so a resolver that dies mid-run can never leave DNS broken.
     let mut ticks = 0u32;
+    let mut hb_passes = 0u32;
     while !stop.load(Ordering::SeqCst) {
         tokio::time::sleep(Duration::from_secs(1)).await;
         on_lock(is_locked());
@@ -267,6 +273,15 @@ async fn enforce(stop: Arc<AtomicBool>, on_lock: impl Fn(bool)) -> anyhow::Resul
 
             ensure_service_running(WATCHDOG_NAME);
             mark_protected_today();
+
+            // Accountability heartbeat: on a coarse cadence, send the partner
+            // the weekly "still protected" digest if one is due. Its absence is
+            // the real tamper signal.
+            hb_passes += 1;
+            if hb_passes >= HEARTBEAT_CHECK_PASSES {
+                hb_passes = 0;
+                maybe_send_heartbeat();
+            }
         }
     }
 
@@ -570,6 +585,53 @@ fn notify_partner_blocking(text: &str) {
             }
         }
     }
+}
+
+/// Send the weekly "still protected" heartbeat to the partner if one is due.
+/// Non-blocking (the notifier spawns its own threads); called on a coarse
+/// cadence from the reconcile loop. No-op unless a channel is configured and the
+/// heartbeat is enabled.
+fn maybe_send_heartbeat() {
+    let Ok(db) = Db::open(paths::db_path()) else {
+        return;
+    };
+    let Ok(cfg) = db.load_config() else { return };
+
+    let webhook = cfg.accountability_webhook.trim();
+    let has_channel = !webhook.is_empty() || cfg.sms_configured();
+    if !cfg.heartbeat_enabled || !has_channel {
+        return;
+    }
+
+    let now = chrono::Utc::now();
+    let last = db.heartbeat_last_sent().ok().flatten();
+    if !crate::heartbeat::due(last, now, crate::heartbeat::interval()) {
+        return;
+    }
+
+    // Build the digest from the local activity log only.
+    let since = now - crate::heartbeat::interval();
+    let urges_week = db.count_events_since("urge_resisted", since).unwrap_or(0);
+    let streak = db.current_streak().unwrap_or(0);
+    let text = crate::heartbeat::message(cfg.protection_enabled, urges_week, streak);
+
+    if !webhook.is_empty() {
+        let stamp = chrono::Local::now().format("%b %d, %I:%M %p");
+        crate::notifier::notify(webhook, &format!("Sanctum · {stamp}\n{text}"));
+    }
+    if cfg.sms_configured() {
+        crate::notifier::send_sms(
+            &cfg.sms_account_sid,
+            &cfg.sms_auth_token,
+            &cfg.sms_from,
+            &cfg.sms_to,
+            &format!("Sanctum: {text}"),
+        );
+    }
+
+    // Stamp AFTER dispatch so a transient failure just retries next cycle.
+    let _ = db.set_heartbeat_last_sent(now);
+    let _ = db.record_event("heartbeat_sent", "", now);
 }
 
 /// The result of an uninstall attempt. The CLI maps this to an exit code +

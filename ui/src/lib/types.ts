@@ -32,6 +32,7 @@ export interface Status {
   accountability_on: boolean;
   accountability_sms_on: boolean;
   accountability_ntfy_topic: string | null;
+  heartbeat_on: boolean;
   has_password: boolean;
   all_browsers: boolean;
 }
@@ -63,6 +64,7 @@ export type Command =
   | { cmd: "set_accountability"; webhook: string; password: string }
   | { cmd: "set_accountability_sms"; sid: string; token: string; from: string; to: string; password: string }
   | { cmd: "test_accountability" }
+  | { cmd: "set_heartbeat"; enabled: boolean; password: string }
   | { cmd: "delete_history" }
   | { cmd: "poll_intervention" }
   | { cmd: "trigger_intervention" }

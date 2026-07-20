@@ -124,6 +124,13 @@ pub struct AppConfig {
     /// Mode is still the honest escape, exactly like a locked session.
     #[serde(default)]
     pub uninstall_cooldown_hours: u32,
+    /// Whether the user *explicitly* opted into the uninstall cooldown. Guards
+    /// the upgrade path: early builds defaulted `uninstall_cooldown_hours` to a
+    /// non-zero value, so a fresh install inheriting an old config would grow-only
+    /// lock the user into a cooldown they never chose. On load, a non-zero
+    /// cooldown without this flag set is healed back to 0 (see `migrate`).
+    #[serde(default)]
+    pub uninstall_cooldown_opted_in: bool,
     /// Opt-in accountability webhook URL (empty = off). Short, human-readable
     /// protection-state signals are POSTed here — never browsing content. Adding
     /// one strengthens protection (easy); changing or removing it is a weakening
@@ -142,6 +149,15 @@ pub struct AppConfig {
     pub sms_from: String,
     #[serde(default)]
     pub sms_to: String,
+    /// Send the accountability partner a periodic "still protected" heartbeat /
+    /// weekly digest. Its whole value is that its ABSENCE is the tamper signal:
+    /// if protection is removed or the machine stops running Sanctum, the weekly
+    /// note simply stops arriving. On by default whenever a partner is set;
+    /// harmless (never sends) if no channel is configured. Turning it off reduces
+    /// oversight, so it is a weakening op (password-gated, frozen while locked,
+    /// alerts the partner) exactly like changing the partner.
+    #[serde(default = "default_true")]
+    pub heartbeat_enabled: bool,
 }
 
 impl AppConfig {
@@ -151,6 +167,25 @@ impl AppConfig {
             && !self.sms_auth_token.trim().is_empty()
             && !self.sms_from.trim().is_empty()
             && !self.sms_to.trim().is_empty()
+    }
+
+    /// Normalize a freshly-loaded config, healing state that could otherwise
+    /// trap the user across an upgrade. Returns true if anything changed, so the
+    /// caller can persist the cleaned value.
+    ///
+    /// Invariant enforced: the uninstall cooldown only binds if the user
+    /// explicitly opted in. A non-zero `uninstall_cooldown_hours` with
+    /// `uninstall_cooldown_opted_in == false` can only be a stale default from an
+    /// older build (early releases defaulted it to 24h). Because the cooldown is
+    /// grow-only, inheriting that would lock the user into a commitment they never
+    /// made — so drop it back to off.
+    pub fn migrate(&mut self) -> bool {
+        let mut changed = false;
+        if self.uninstall_cooldown_hours > 0 && !self.uninstall_cooldown_opted_in {
+            self.uninstall_cooldown_hours = 0;
+            changed = true;
+        }
+        changed
     }
 }
 
@@ -173,11 +208,13 @@ impl Default for AppConfig {
             block_doh_ips: true,
             block_plaintext_dns: false,
             uninstall_cooldown_hours: 0,
+            uninstall_cooldown_opted_in: false,
             accountability_webhook: String::new(),
             sms_account_sid: String::new(),
             sms_auth_token: String::new(),
             sms_from: String::new(),
             sms_to: String::new(),
+            heartbeat_enabled: true,
         }
     }
 }
@@ -362,6 +399,30 @@ mod tests {
         assert!(guard_cooldown_change(24, 12).is_err());
         assert!(guard_cooldown_change(24, 0).is_err());
         assert_eq!(guard_cooldown_change(24, 24).unwrap(), 24);
+    }
+
+    #[test]
+    fn migrate_heals_stale_cooldown_but_keeps_real_optin() {
+        // A stale non-zero cooldown from an old build's DEFAULT (no opt-in flag)
+        // must be healed to off, so an upgrade can't re-arm it silently.
+        let mut stale = AppConfig::default();
+        stale.uninstall_cooldown_hours = 24;
+        stale.uninstall_cooldown_opted_in = false;
+        assert!(stale.migrate());
+        assert_eq!(stale.uninstall_cooldown_hours, 0);
+
+        // A cooldown the user actually chose (flag set) is preserved untouched.
+        let mut chosen = AppConfig::default();
+        chosen.uninstall_cooldown_hours = 48;
+        chosen.uninstall_cooldown_opted_in = true;
+        assert!(!chosen.migrate());
+        assert_eq!(chosen.uninstall_cooldown_hours, 48);
+
+        // Off stays off, and migrate is idempotent.
+        let mut off = AppConfig::default();
+        assert!(!off.migrate());
+        assert!(!off.migrate());
+        assert_eq!(off.uninstall_cooldown_hours, 0);
     }
 
     #[test]

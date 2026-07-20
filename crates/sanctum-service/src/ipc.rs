@@ -312,6 +312,37 @@ impl IpcHandler {
                 Response::Ok
             }
 
+            Command::SetHeartbeat { enabled, password } => {
+                // Enabling adds oversight (always allowed). Disabling reduces it,
+                // so it is password-gated, frozen while locked, and alerts the
+                // partner so the weekly signal can't be cut silently.
+                if !enabled {
+                    if locked {
+                        return Ok(denied(
+                            "The weekly check-in can't be turned off during a locked session.",
+                        ));
+                    }
+                    if !check_password(&db, &password)? {
+                        return Ok(denied("Incorrect password."));
+                    }
+                }
+                let mut cfg = db.load_config()?;
+                if cfg.heartbeat_enabled == enabled {
+                    return Ok(Response::Ok); // no change
+                }
+                cfg.heartbeat_enabled = enabled;
+                db.save_config(&cfg)?;
+                db.record_event(
+                    if enabled { "heartbeat_on" } else { "heartbeat_off" },
+                    "",
+                    now,
+                )?;
+                if !enabled {
+                    notify_partner(&db, "Weekly protection check-ins were turned off.");
+                }
+                Response::Ok
+            }
+
             Command::SetUninstallCooldown { hours } => {
                 // Grow-only: enabling/increasing only strengthens (no password);
                 // reducing or disabling once set is refused by the guard.
@@ -320,6 +351,12 @@ impl IpcHandler {
                     Ok(accepted) => {
                         let was = cfg.uninstall_cooldown_hours;
                         cfg.uninstall_cooldown_hours = accepted;
+                        // Record that this is an explicit user choice, so it
+                        // survives upgrades (a stale non-zero default without this
+                        // flag is healed to 0 on load — see AppConfig::migrate).
+                        if accepted > 0 {
+                            cfg.uninstall_cooldown_opted_in = true;
+                        }
                         db.save_config(&cfg)?;
                         db.record_event(
                             "uninstall_cooldown_set",
@@ -494,6 +531,7 @@ impl IpcHandler {
             .strip_prefix("https://ntfy.sh/")
             .filter(|t| !t.is_empty())
             .map(str::to_string);
+        let heartbeat_on = cfg.heartbeat_enabled;
         Ok(Status {
             protection_active: cfg.protection_enabled,
             blocking_now,
@@ -513,6 +551,7 @@ impl IpcHandler {
             accountability_on,
             accountability_sms_on,
             accountability_ntfy_topic,
+            heartbeat_on,
             has_password: db.has_password()?,
             all_browsers: true,
         })

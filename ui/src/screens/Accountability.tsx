@@ -4,8 +4,9 @@ import type { Response, Status } from "../lib/types";
 import { sendCommand } from "../lib/ipc";
 import TopBar from "../components/TopBar";
 import Button from "../components/Button";
+import Switch from "../components/Switch";
 import ConfirmModal from "../components/ConfirmModal";
-import { GroupLabel, GroupFootnote } from "../components/List";
+import { GroupLabel, GroupFootnote, Row } from "../components/List";
 
 // Honest accountability. The one-tap default is ntfy: Sanctum generates a
 // private topic, the partner installs the free ntfy app and scans a code — the
@@ -35,6 +36,7 @@ export default function Accountability({
   const customWebhookOn = webhookOn && !ntfyTopic;
   const smsOn = !!status?.accountability_sms_on;
   const anyOn = webhookOn || smsOn;
+  const heartbeatOn = status?.heartbeat_on ?? true;
   const locked = !!status?.locked;
   const hasPassword = !!status?.has_password;
 
@@ -48,6 +50,7 @@ export default function Accountability({
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<null | "webhook" | "sms">(null);
+  const [confirmHeartbeatOff, setConfirmHeartbeatOff] = useState(false);
 
   const run = async (cmd: Parameters<typeof sendCommand>[0], ok: string) => {
     setBusy(true);
@@ -67,6 +70,14 @@ export default function Accountability({
     );
 
   const test = () => run({ cmd: "test_accountability" }, "Test sent — ask them to confirm it arrived.");
+
+  const onToggleHeartbeat = () => {
+    if (heartbeatOn) {
+      setConfirmHeartbeatOff(true); // turning it off reduces oversight — confirm
+    } else {
+      run({ cmd: "set_heartbeat", enabled: true, password }, "Weekly check-in turned on.");
+    }
+  };
 
   const smsComplete = sid.trim() && token.trim() && from.trim() && to.trim();
 
@@ -122,6 +133,30 @@ export default function Accountability({
           </>
         )}
       </div>
+
+      {/* Weekly "still protected" heartbeat — its absence is the tamper signal. */}
+      {anyOn && (
+        <div className="mt-8">
+          <GroupLabel>Weekly check-in</GroupLabel>
+          <Row>
+            <span className="flex flex-col pr-3">
+              <span className="t-row-title">Send a weekly "still protected" note</span>
+              <span className="t-caption">
+                A short note each week that protection is still on. If it ever stops arriving, your
+                partner knows to check in.
+              </span>
+            </span>
+            <span className="row-trailing">
+              <Switch
+                checked={heartbeatOn}
+                disabled={busy || locked}
+                onChange={onToggleHeartbeat}
+                label="Weekly check-in"
+              />
+            </span>
+          </Row>
+        </div>
+      )}
 
       {/* Advanced: custom webhook + Twilio SMS. */}
       <div className="mt-8">
@@ -222,6 +257,18 @@ export default function Accountability({
           }
         }}
         onCancel={() => setConfirmRemove(null)}
+      />
+
+      <ConfirmModal
+        open={confirmHeartbeatOff}
+        title="Turn off weekly check-ins?"
+        body="Your partner will stop getting the weekly note that protection is still on, and they'll be told it was turned off. You can turn it back on anytime."
+        confirmLabel="Turn off"
+        onConfirm={() => {
+          setConfirmHeartbeatOff(false);
+          run({ cmd: "set_heartbeat", enabled: false, password }, "Weekly check-in turned off. Your partner was told.").then(() => setPassword(""));
+        }}
+        onCancel={() => setConfirmHeartbeatOff(false)}
       />
     </div>
   );

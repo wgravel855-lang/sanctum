@@ -104,7 +104,15 @@ impl Db {
 
     pub fn load_config(&self) -> Result<AppConfig> {
         match self.get_kv("config")? {
-            Some(json) => Ok(serde_json::from_str(&json)?),
+            Some(json) => {
+                let mut cfg: AppConfig = serde_json::from_str(&json)?;
+                // Heal state that could trap the user across an upgrade (e.g. a
+                // stale non-zero uninstall cooldown from an old build's default).
+                if cfg.migrate() {
+                    self.save_config(&cfg)?;
+                }
+                Ok(cfg)
+            }
             None => {
                 let cfg = AppConfig::default();
                 self.save_config(&cfg)?;
@@ -295,6 +303,29 @@ impl Db {
             .conn
             .query_row("SELECT COUNT(*) FROM events", [], |r| r.get::<_, i64>(0))?
             as u64)
+    }
+
+    /// Count events of `kind` at or after `since`. Used to build the weekly
+    /// accountability heartbeat/digest (e.g. urges resisted in the past 7 days).
+    pub fn count_events_since(&self, kind: &str, since: DateTime<Utc>) -> Result<u64> {
+        Ok(self.conn.query_row(
+            "SELECT COUNT(*) FROM events WHERE kind = ?1 AND ts >= ?2",
+            params![kind, since.timestamp()],
+            |r| r.get::<_, i64>(0),
+        )? as u64)
+    }
+
+    /// When the last "still protected" heartbeat was sent to the partner
+    /// (`None` if never). Drives the weekly cadence.
+    pub fn heartbeat_last_sent(&self) -> Result<Option<DateTime<Utc>>> {
+        Ok(self
+            .get_kv("heartbeat_last_sent")?
+            .and_then(|s| s.parse::<i64>().ok())
+            .and_then(|t| Utc.timestamp_opt(t, 0).single()))
+    }
+
+    pub fn set_heartbeat_last_sent(&self, now: DateTime<Utc>) -> Result<()> {
+        self.set_kv("heartbeat_last_sent", &now.timestamp().to_string())
     }
 
     // ---- protected-days streak ----

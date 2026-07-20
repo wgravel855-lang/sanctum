@@ -33,6 +33,7 @@ const mockStatus: Status = {
   accountability_on: false,
   accountability_sms_on: false,
   accountability_ntfy_topic: null,
+  heartbeat_on: true,
   has_password: false,
   all_browsers: true,
 };
@@ -169,6 +170,14 @@ async function mockCommand(cmd: Command): Promise<Response> {
       return mockAccountabilityWebhook.trim() || mockStatus.accountability_sms_on
         ? { resp: "ok" }
         : { resp: "denied", body: { reason: "No accountability partner is set." } };
+    case "set_heartbeat":
+      if (!cmd.enabled) {
+        if (mockStatus.locked)
+          return { resp: "denied", body: { reason: "The weekly check-in can't be turned off during a locked session." } };
+        if (!gate(cmd.password)) return { resp: "denied", body: { reason: "Incorrect password." } };
+      }
+      mockStatus.heartbeat_on = cmd.enabled;
+      return { resp: "ok" };
     case "resolve_intervention":
       mockStatus.urges_resisted += 1;
       return { resp: "ok" };

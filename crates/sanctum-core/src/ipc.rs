@@ -74,6 +74,10 @@ pub enum Command {
     },
     /// Send a test notification to every configured accountability channel.
     TestAccountability,
+    /// Toggle the weekly "still protected" heartbeat to the partner. Enabling is
+    /// always allowed (more oversight); disabling reduces oversight, so it is
+    /// password-gated, frozen while locked, and alerts the partner.
+    SetHeartbeat { enabled: bool, password: String },
     /// Wipe the activity log immediately.
     DeleteHistory,
     /// Poll for a pending block-moment intervention (v0.1.5 §A). The UI calls
@@ -166,6 +170,10 @@ pub struct Status {
     /// UI can re-show the partner's QR). `None` for a custom webhook or when off.
     #[serde(default)]
     pub accountability_ntfy_topic: Option<String>,
+    /// Whether the weekly "still protected" heartbeat/digest is enabled. Only
+    /// sends when a partner channel is configured.
+    #[serde(default)]
+    pub heartbeat_on: bool,
     pub has_password: bool,
     /// The "All browsers protected" status line.
     pub all_browsers: bool,

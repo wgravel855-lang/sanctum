@@ -5,6 +5,7 @@ pub mod browser_policy;
 pub mod dns;
 pub mod engine;
 pub mod firewall;
+pub mod heartbeat;
 pub mod hostsfile;
 pub mod intervention;
 pub mod ipc;
