@@ -290,11 +290,12 @@ export default function BlockList({
         <Button className="mt-3" onClick={addKeyword} disabled={busy}>
           Add keyword
         </Button>
-        <GroupFootnote>
-          {keywordsOn
-            ? "Matched against a site's web address only, never the page itself. Words shorter than five letters must match whole, so essex.ac.uk keeps working."
-            : "Turn on Block by keyword in Protection for these to take effect. They match a site's web address only, never the page itself."}
-        </GroupFootnote>
+        {keywordsOn && (
+          <GroupFootnote>
+            Matched against a site's web address only, never the page itself. Words shorter than
+            five letters must match whole, so essex.ac.uk keeps working.
+          </GroupFootnote>
+        )}
       </div>
 
       <div className="mt-8">
@@ -314,11 +315,12 @@ export default function BlockList({
         {note && <p className="t-caption mt-2 text-center">{note}</p>}
       </div>
 
-      <GroupFootnote>
-        {approvalOn
-          ? "Unblocking needs your partner's approval: they read you a one-time code for the site you asked about. Adding sites is always allowed."
-          : "You can always add sites. During a locked session the list can only grow, so removing a site is disabled until the lock ends. That friction is the point."}
-      </GroupFootnote>
+      {approvalOn && (
+        <GroupFootnote>
+          Unblocking needs your partner's approval: they read you a one-time code for the site you
+          asked about. Adding sites is always allowed.
+        </GroupFootnote>
+      )}
     </div>
   );
 }
