@@ -34,6 +34,8 @@ const mockStatus: Status = {
   accountability_sms_on: false,
   accountability_ntfy_topic: null,
   heartbeat_on: true,
+  require_partner_approval: false,
+  pending_unblock: null,
   has_password: false,
   all_browsers: true,
 };
@@ -52,6 +54,7 @@ let mockEvents: EventDto[] = (() => {
 let mockPassword: string | null = null;
 let mockAccountabilityWebhook = "";
 let mockSms = { sid: "", token: "", from: "", to: "" };
+let mockPending: { domain: string; code: string; attempts: number } | null = null;
 let mockCustomBlocks: string[] = ["distracting-site.net", "one-more-thing.com"];
 let mockLetter: string | null =
   "Remember why you started. The version of you that set this up was thinking clearly and wanted better for you. This feeling passes. You are not missing anything real.";
@@ -83,6 +86,8 @@ async function mockCommand(cmd: Command): Promise<Response> {
     case "remove_block":
       if (mockStatus.locked)
         return { resp: "denied", body: { reason: "The block list can only grow during a locked session." } };
+      if (mockStatus.require_partner_approval)
+        return { resp: "denied", body: { reason: "Your partner's approval is required to unblock. Request it instead." } };
       if (!gate(cmd.password)) return { resp: "denied", body: { reason: "Incorrect password." } };
       if (mockCustomBlocks.includes(cmd.domain)) {
         mockCustomBlocks = mockCustomBlocks.filter((d) => d !== cmd.domain);
@@ -178,6 +183,48 @@ async function mockCommand(cmd: Command): Promise<Response> {
       }
       mockStatus.heartbeat_on = cmd.enabled;
       return { resp: "ok" };
+    case "set_partner_approval":
+      if (cmd.enabled) {
+        if (!mockAccountabilityWebhook.trim() && !mockStatus.accountability_sms_on)
+          return { resp: "denied", body: { reason: "Set up an accountability partner first, so they can approve unblock requests." } };
+      } else {
+        if (mockStatus.locked)
+          return { resp: "denied", body: { reason: "Partner approval can't be turned off during a locked session." } };
+        if (!gate(cmd.password)) return { resp: "denied", body: { reason: "Incorrect password." } };
+      }
+      mockStatus.require_partner_approval = cmd.enabled;
+      mockPending = null;
+      mockStatus.pending_unblock = null;
+      return { resp: "ok" };
+    case "request_unblock": {
+      if (!mockStatus.require_partner_approval)
+        return { resp: "denied", body: { reason: "Partner approval isn't turned on." } };
+      const domain = cmd.domain.trim().toLowerCase();
+      if (!domain) return { resp: "denied", body: { reason: "Enter a site to unblock." } };
+      const code = "BCD234"; // mock only: fixed so the preview flow is testable
+      mockPending = { domain, code, attempts: 0 };
+      mockStatus.pending_unblock = domain;
+      (globalThis as { __sanctumMockCode?: string }).__sanctumMockCode = code;
+      return { resp: "ok" };
+    }
+    case "approve_unblock": {
+      if (!mockPending) return { resp: "denied", body: { reason: "There's no unblock request waiting." } };
+      if (cmd.code.trim().toUpperCase() === mockPending.code) {
+        mockCustomBlocks = mockCustomBlocks.filter((d) => d !== mockPending!.domain);
+        mockStatus.custom_block_count = mockCustomBlocks.length;
+        mockPending = null;
+        mockStatus.pending_unblock = null;
+        return { resp: "ok" };
+      }
+      mockPending.attempts += 1;
+      const left = 5 - mockPending.attempts;
+      if (left <= 0) {
+        mockPending = null;
+        mockStatus.pending_unblock = null;
+        return { resp: "denied", body: { reason: "That code was wrong too many times. Start a new request." } };
+      }
+      return { resp: "denied", body: { reason: `That code didn't match. ${left} tries left.` } };
+    }
     case "resolve_intervention":
       mockStatus.urges_resisted += 1;
       return { resp: "ok" };

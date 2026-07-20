@@ -11,6 +11,7 @@
 //! Design principle: **honesty and fail-safety over cleverness.** Nothing
 //! here hides itself or makes the machine unusable. See docs/ADR-001.
 
+pub mod approval;
 pub mod blocklist;
 pub mod config;
 pub mod domain;

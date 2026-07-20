@@ -33,6 +33,8 @@ export interface Status {
   accountability_sms_on: boolean;
   accountability_ntfy_topic: string | null;
   heartbeat_on: boolean;
+  require_partner_approval: boolean;
+  pending_unblock: string | null;
   has_password: boolean;
   all_browsers: boolean;
 }
@@ -65,6 +67,9 @@ export type Command =
   | { cmd: "set_accountability_sms"; sid: string; token: string; from: string; to: string; password: string }
   | { cmd: "test_accountability" }
   | { cmd: "set_heartbeat"; enabled: boolean; password: string }
+  | { cmd: "set_partner_approval"; enabled: boolean; password: string }
+  | { cmd: "request_unblock"; domain: string }
+  | { cmd: "approve_unblock"; code: string }
   | { cmd: "delete_history" }
   | { cmd: "poll_intervention" }
   | { cmd: "trigger_intervention" }

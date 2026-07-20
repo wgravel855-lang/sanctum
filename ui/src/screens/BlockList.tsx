@@ -16,9 +16,13 @@ export default function BlockList({
 }) {
   const locked = !!status?.locked;
   const hasPassword = !!status?.has_password;
+  const approvalOn = !!status?.require_partner_approval;
+  const pending = status?.pending_unblock ?? null;
 
   const [custom, setCustom] = useState<string[]>([]);
   const [domain, setDomain] = useState("");
+  const [unblockDomain, setUnblockDomain] = useState("");
+  const [code, setCode] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
@@ -58,9 +62,37 @@ export default function BlockList({
     setBusy(false);
   };
 
+  // Partner-approval flow: instead of a self-service remove, ask the partner.
+  const requestUnblock = async (d: string) => {
+    const dom = d.trim().toLowerCase();
+    if (!dom) return;
+    setBusy(true);
+    setNote(null);
+    const r = await sendCommand({ cmd: "request_unblock", domain: dom });
+    if (r.resp === "ok") setNote(`Asked your partner about ${dom}. When they approve, they'll read you a code.`);
+    else if (r.resp === "denied") setNote(r.body.reason);
+    setUnblockDomain("");
+    await refresh();
+    setBusy(false);
+  };
+
+  const approve = async () => {
+    if (!code.trim()) return;
+    setBusy(true);
+    setNote(null);
+    const r = await sendCommand({ cmd: "approve_unblock", code: code.trim() });
+    if (r.resp === "ok") setNote(`Unblocked ${pending ?? "the site"}. Thank your partner.`);
+    else if (r.resp === "denied") setNote(r.body.reason);
+    setCode("");
+    await loadCustom();
+    await refresh();
+    setBusy(false);
+  };
+
   const onRemoveClick = (d: string) => {
     setNote(null);
-    if (hasPassword) setPendingRemove(d);
+    if (approvalOn) requestUnblock(d);
+    else if (hasPassword) setPendingRemove(d);
     else doRemove(d, "");
   };
 
@@ -72,6 +104,38 @@ export default function BlockList({
         Sanctum already blocks tens of thousands of adult sites out of the box.
         Add anything else you want kept out here.
       </p>
+
+      {/* A pending partner-approval request, if one is in flight. */}
+      {approvalOn && pending && (
+        <div className="mt-8 rounded-[16px] border border-hairline bg-surface-1 p-5">
+          <p className="t-row-title">Waiting for your partner's code</p>
+          <p className="t-caption mt-1">
+            To unblock <span className="text-text-1">{pending}</span>, ask your partner for the
+            one-time code Sanctum sent them, then enter it below.
+          </p>
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            onKeyDown={(e) => e.key === "Enter" && approve()}
+            placeholder="Partner's code"
+            autoCapitalize="characters"
+            spellCheck={false}
+            className="field mt-4 text-center tracking-[0.3em]"
+          />
+          <div className="mt-3 flex items-center justify-between">
+            <button
+              onClick={() => requestUnblock(pending)}
+              disabled={busy}
+              className="pressable text-[15px] text-text-2 disabled:opacity-50"
+            >
+              Resend code
+            </button>
+            <Button onClick={approve} disabled={busy || !code.trim()}>
+              Unblock
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* User-added sites (removable). The built-in baseline isn't user-managed
           and isn't listed or counted here. */}
@@ -90,10 +154,10 @@ export default function BlockList({
                   ) : (
                     <button
                       onClick={() => onRemoveClick(d)}
-                      disabled={busy}
+                      disabled={busy || (approvalOn && !!pending)}
                       className="pressable text-[15px] text-destructive disabled:opacity-50"
                     >
-                      Remove
+                      {approvalOn ? "Request unblock" : "Remove"}
                     </button>
                   )}
                 </span>
@@ -134,6 +198,27 @@ export default function BlockList({
         )}
       </div>
 
+      {/* Ask a partner to unblock a site that isn't your own (an allowlist
+          exception on the built-in list). Only when approval is required. */}
+      {approvalOn && !pending && !locked && (
+        <div className="mt-8">
+          <GroupLabel>Ask to unblock a site</GroupLabel>
+          <input
+            value={unblockDomain}
+            onChange={(e) => setUnblockDomain(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && requestUnblock(unblockDomain)}
+            placeholder="example.com"
+            spellCheck={false}
+            autoCapitalize="none"
+            className="field"
+          />
+          <Button className="mt-3" onClick={() => requestUnblock(unblockDomain)} disabled={busy}>
+            Request approval
+          </Button>
+          <GroupFootnote>Sanctum sends your partner a one-time code for this exact site. Only they can approve it.</GroupFootnote>
+        </div>
+      )}
+
       <div className="mt-8">
         <GroupLabel>Add a site</GroupLabel>
         <input
@@ -152,8 +237,9 @@ export default function BlockList({
       </div>
 
       <GroupFootnote>
-        You can always add sites. During a locked session the list can only grow, so removing a
-        site is disabled until the lock ends. That friction is the point.
+        {approvalOn
+          ? "Unblocking needs your partner's approval: they read you a one-time code for the site you asked about. Adding sites is always allowed."
+          : "You can always add sites. During a locked session the list can only grow, so removing a site is disabled until the lock ends. That friction is the point."}
       </GroupFootnote>
     </div>
   );

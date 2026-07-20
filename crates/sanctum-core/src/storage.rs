@@ -328,6 +328,24 @@ impl Db {
         self.set_kv("heartbeat_last_sent", &now.timestamp().to_string())
     }
 
+    // ---- partner-approved unblock ----
+
+    /// The pending unblock request awaiting a partner code (`None` if none).
+    pub fn load_pending_unblock(&self) -> Result<Option<crate::approval::PendingUnblock>> {
+        Ok(self
+            .get_kv("pending_unblock")?
+            .filter(|s| !s.is_empty())
+            .and_then(|j| serde_json::from_str(&j).ok()))
+    }
+
+    pub fn save_pending_unblock(&self, p: &crate::approval::PendingUnblock) -> Result<()> {
+        self.set_kv("pending_unblock", &serde_json::to_string(p)?)
+    }
+
+    pub fn clear_pending_unblock(&self) -> Result<()> {
+        self.set_kv("pending_unblock", "")
+    }
+
     // ---- protected-days streak ----
 
     pub fn mark_protected_today(&self) -> Result<()> {

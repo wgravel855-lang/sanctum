@@ -149,6 +149,14 @@ pub struct AppConfig {
     pub sms_from: String,
     #[serde(default)]
     pub sms_to: String,
+    /// Require the accountability partner's approval to unblock a site (remove a
+    /// user-added block, or add an allowlist exception). When on, self-service
+    /// unblocking with the settings password is disabled — the partner relays a
+    /// one-time code instead (see `approval`). Enabling needs a partner channel;
+    /// disabling is a weakening op (password-gated, frozen while locked, alerts
+    /// the partner). Off by default.
+    #[serde(default)]
+    pub require_partner_approval: bool,
     /// Send the accountability partner a periodic "still protected" heartbeat /
     /// weekly digest. Its whole value is that its ABSENCE is the tamper signal:
     /// if protection is removed or the machine stops running Sanctum, the weekly
@@ -214,6 +222,7 @@ impl Default for AppConfig {
             sms_auth_token: String::new(),
             sms_from: String::new(),
             sms_to: String::new(),
+            require_partner_approval: false,
             heartbeat_enabled: true,
         }
     }

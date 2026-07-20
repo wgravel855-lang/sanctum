@@ -78,6 +78,15 @@ pub enum Command {
     /// always allowed (more oversight); disabling reduces oversight, so it is
     /// password-gated, frozen while locked, and alerts the partner.
     SetHeartbeat { enabled: bool, password: String },
+    /// Turn partner-approved unblocking on/off. Enabling adds a gate (allowed,
+    /// but needs a partner channel configured); disabling is a weakening op
+    /// (password-gated, frozen while locked, alerts the partner).
+    SetPartnerApproval { enabled: bool, password: String },
+    /// Ask to unblock `domain` (only when partner approval is required). Mints a
+    /// one-time code, sends it to the partner, and stores the pending request.
+    RequestUnblock { domain: String },
+    /// Submit the partner's one-time code to complete the pending unblock.
+    ApproveUnblock { code: String },
     /// Wipe the activity log immediately.
     DeleteHistory,
     /// Poll for a pending block-moment intervention (v0.1.5 §A). The UI calls
@@ -174,6 +183,13 @@ pub struct Status {
     /// sends when a partner channel is configured.
     #[serde(default)]
     pub heartbeat_on: bool,
+    /// Whether unblocking a site requires the partner's one-time code.
+    #[serde(default)]
+    pub require_partner_approval: bool,
+    /// The domain of a pending unblock request awaiting the partner's code
+    /// (`None` if there is no request in flight).
+    #[serde(default)]
+    pub pending_unblock: Option<String>,
     pub has_password: bool,
     /// The "All browsers protected" status line.
     pub all_browsers: bool,

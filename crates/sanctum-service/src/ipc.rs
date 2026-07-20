@@ -15,7 +15,7 @@ use tokio::net::windows::named_pipe::{ClientOptions, NamedPipeServer, ServerOpti
 
 use sanctum_core::config::{self, LockState};
 use sanctum_core::ipc::{Command, EventDto, Response, Status};
-use sanctum_core::{ipc as proto, Db};
+use sanctum_core::{approval, ipc as proto, password, Db};
 
 use std::ffi::c_void;
 use std::sync::OnceLock;
@@ -139,6 +139,11 @@ impl IpcHandler {
                 if locked {
                     return Ok(denied("The block list can only grow during a locked session."));
                 }
+                if db.load_config()?.require_partner_approval {
+                    return Ok(denied(
+                        "Your partner's approval is required to unblock. Request it instead.",
+                    ));
+                }
                 if !check_password(&db, &password)? {
                     return Ok(denied("Incorrect password."));
                 }
@@ -151,6 +156,11 @@ impl IpcHandler {
             Command::AddAllow { domain, password } => {
                 if locked {
                     return Ok(denied("The allowlist is frozen during a locked session."));
+                }
+                if db.load_config()?.require_partner_approval {
+                    return Ok(denied(
+                        "Your partner's approval is required to unblock. Request it instead.",
+                    ));
                 }
                 if !check_password(&db, &password)? {
                     return Ok(denied("Incorrect password."));
@@ -343,6 +353,139 @@ impl IpcHandler {
                 Response::Ok
             }
 
+            Command::SetPartnerApproval { enabled, password } => {
+                let mut cfg = db.load_config()?;
+                if cfg.require_partner_approval == enabled {
+                    return Ok(Response::Ok); // no change
+                }
+                if enabled {
+                    // Enabling adds a gate (allowed), but it would be a trap
+                    // without anyone to relay codes — require a partner channel.
+                    let has_channel =
+                        !cfg.accountability_webhook.trim().is_empty() || cfg.sms_configured();
+                    if !has_channel {
+                        return Ok(denied(
+                            "Set up an accountability partner first, so they can approve unblock requests.",
+                        ));
+                    }
+                } else {
+                    // Disabling removes oversight: password-gated, frozen while
+                    // locked, and it alerts the partner.
+                    if locked {
+                        return Ok(denied(
+                            "Partner approval can't be turned off during a locked session.",
+                        ));
+                    }
+                    if !check_password(&db, &password)? {
+                        return Ok(denied("Incorrect password."));
+                    }
+                }
+                cfg.require_partner_approval = enabled;
+                db.save_config(&cfg)?;
+                db.clear_pending_unblock()?; // any in-flight request is moot now
+                db.record_event(
+                    if enabled { "partner_approval_on" } else { "partner_approval_off" },
+                    "",
+                    now,
+                )?;
+                notify_partner(
+                    &db,
+                    if enabled {
+                        "You are now the approver for unblock requests. They'll text you a one-time code to read back when they ask to unblock a site."
+                    } else {
+                        "Partner approval for unblocking was turned off."
+                    },
+                );
+                Response::Ok
+            }
+
+            Command::RequestUnblock { domain } => {
+                let cfg = db.load_config()?;
+                if !cfg.require_partner_approval {
+                    return Ok(denied("Partner approval isn't turned on."));
+                }
+                if locked {
+                    return Ok(denied("Unblocking is frozen during a locked session."));
+                }
+                let domain = domain.trim().to_lowercase();
+                if domain.is_empty() {
+                    return Ok(denied("Enter a site to unblock."));
+                }
+                // Removing the user's own block vs. allowlisting a built-in one.
+                let action = if db.list_custom_block()?.iter().any(|d| d == &domain) {
+                    approval::UnblockAction::RemoveBlock
+                } else {
+                    approval::UnblockAction::AddAllow
+                };
+                let code = approval::generate_code();
+                let pending = approval::PendingUnblock {
+                    domain: domain.clone(),
+                    action,
+                    code_hash: password::hash_password(&code)?,
+                    created_at: now,
+                    attempts: 0,
+                };
+                db.save_pending_unblock(&pending)?;
+                db.record_event("unblock_requested", &domain, now)?;
+                notify_partner(
+                    &db,
+                    &format!(
+                        "Unblock request: they want to allow {domain}. If you approve, read them this code: {code}. If not, ignore this. (Expires in {} min.)",
+                        approval::REQUEST_TTL_MINS
+                    ),
+                );
+                Response::Ok
+            }
+
+            Command::ApproveUnblock { code } => {
+                if locked {
+                    return Ok(denied("Unblocking is frozen during a locked session."));
+                }
+                let Some(mut pending) = db.load_pending_unblock()? else {
+                    return Ok(denied("There's no unblock request waiting."));
+                };
+                match approval::check_code(&pending, &code, now)? {
+                    approval::ApprovalOutcome::Approved => {
+                        match pending.action {
+                            approval::UnblockAction::RemoveBlock => {
+                                db.remove_custom_block(&pending.domain)?;
+                            }
+                            approval::UnblockAction::AddAllow => {
+                                db.add_allow(&pending.domain, now)?;
+                            }
+                        }
+                        db.clear_pending_unblock()?;
+                        self.apply_enforcement(&db)?;
+                        db.record_event("unblock_approved", &pending.domain, now)?;
+                        notify_partner(
+                            &db,
+                            &format!("{} was unblocked with your approval.", pending.domain),
+                        );
+                        Response::Ok
+                    }
+                    approval::ApprovalOutcome::Wrong { attempts_left } => {
+                        pending.attempts += 1;
+                        db.save_pending_unblock(&pending)?;
+                        if attempts_left == 0 {
+                            db.clear_pending_unblock()?;
+                            denied("That code was wrong too many times. Start a new request.")
+                        } else {
+                            denied(&format!(
+                                "That code didn't match. {attempts_left} tries left."
+                            ))
+                        }
+                    }
+                    approval::ApprovalOutcome::Expired => {
+                        db.clear_pending_unblock()?;
+                        denied("That request expired. Start a new one.")
+                    }
+                    approval::ApprovalOutcome::TooManyAttempts => {
+                        db.clear_pending_unblock()?;
+                        denied("Too many tries. Start a new request.")
+                    }
+                }
+            }
+
             Command::SetUninstallCooldown { hours } => {
                 // Grow-only: enabling/increasing only strengthens (no password);
                 // reducing or disabling once set is refused by the guard.
@@ -532,6 +675,14 @@ impl IpcHandler {
             .filter(|t| !t.is_empty())
             .map(str::to_string);
         let heartbeat_on = cfg.heartbeat_enabled;
+        let require_partner_approval = cfg.require_partner_approval;
+        let pending_unblock = db.load_pending_unblock()?.and_then(|p| {
+            if p.is_expired(chrono::Utc::now()) {
+                None
+            } else {
+                Some(p.domain)
+            }
+        });
         Ok(Status {
             protection_active: cfg.protection_enabled,
             blocking_now,
@@ -552,6 +703,8 @@ impl IpcHandler {
             accountability_sms_on,
             accountability_ntfy_topic,
             heartbeat_on,
+            require_partner_approval,
+            pending_unblock,
             has_password: db.has_password()?,
             all_browsers: true,
         })
