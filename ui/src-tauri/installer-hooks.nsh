@@ -40,6 +40,10 @@
     Sleep 500
     Goto sanctum_wait_both
   sanctum_pre_stuck:
+    ; Never prompt during a silent/unattended install (e.g. winget's sandbox):
+    ; a dialog with no one to click it hangs the install. Fail via the error
+    ; flag + Abort instead; the message is only for an interactive run.
+    IfSilent +2
     MessageBox MB_OK|MB_ICONSTOP "Sanctum couldn't stop its background protection to update it.$\n$\nThis usually means a locked session is still active. Wait for the timer to finish, or reboot Windows into Safe Mode and run sanctum-recover.exe, then run the installer again."
     SetErrors
     Abort
@@ -55,6 +59,10 @@
   DetailPrint "sanctum-service install exited with $0"
   ; Do not let a failed registration masquerade as a successful install.
   StrCmp $0 "0" sanctum_post_ok
+    ; Silent installs must not prompt. Still set the error flag so the failure
+    ; is reported honestly via the exit code (protection isn't active) rather
+    ; than surfaced as a dialog nobody can dismiss.
+    IfSilent +2
     MessageBox MB_OK|MB_ICONEXCLAMATION "Sanctum's protection service could not be registered (code $0), so filtering is NOT active yet.$\n$\nRun the installer again. If it keeps failing, reboot and retry, or remove any leftover 'SanctumService' entry from Windows Services first."
     SetErrors
   sanctum_post_ok:
@@ -77,13 +85,17 @@
   StrCmp $0 "0" sanctum_uninstall_ok
   StrCmp $0 "3" sanctum_cd_armed
   StrCmp $0 "4" sanctum_cd_wait
-  ; Default (locked session, code 2, or any other refusal).
+  ; Default (locked session, code 2, or any other refusal). Silent runs (an
+  ; upgrade's old-uninstaller, or an unattended sandbox) Abort without a dialog.
+  IfSilent +2
   MessageBox MB_OK|MB_ICONSTOP "A locked Sanctum session is still active, so Sanctum can't be uninstalled yet.$\n$\nWait for the timer to end, or reboot Windows into Safe Mode and run sanctum-recover.exe to remove it. That friction is the point."
   Abort
   sanctum_cd_armed:
+    IfSilent +2
     MessageBox MB_OK|MB_ICONINFORMATION "You set an uninstall cooldown, so Sanctum can't be removed right away.$\n$\nThe cooldown just started. Run this uninstaller again after it elapses to finish removing Sanctum.$\n$\n(To remove it right now, reboot into Safe Mode and run sanctum-recover.exe.)"
     Abort
   sanctum_cd_wait:
+    IfSilent +2
     MessageBox MB_OK|MB_ICONINFORMATION "Your uninstall cooldown is still counting down.$\n$\nRun this uninstaller again once it finishes, or reboot into Safe Mode and run sanctum-recover.exe to remove it now."
     Abort
   sanctum_uninstall_ok:
